@@ -1,0 +1,212 @@
+[
+  {
+    "lot": "Lot A",
+    "device_count": 609,
+    "median_minutes_to_stadium": 13.5,
+    "median_minutes_from_stadium": 6.3,
+    "local_pct": 68.0,
+    "visitor_pct": 30.4,
+    "unknown_pct": 1.6,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot C",
+    "device_count": 490,
+    "median_minutes_to_stadium": 15.3,
+    "median_minutes_from_stadium": 5.0,
+    "local_pct": 47.2,
+    "visitor_pct": 49.2,
+    "unknown_pct": 3.6,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot N/Rideshare Drop-Off",
+    "device_count": 476,
+    "median_minutes_to_stadium": 19.3,
+    "median_minutes_from_stadium": 7.1,
+    "local_pct": 42.2,
+    "visitor_pct": 55.1,
+    "unknown_pct": 2.7,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot J",
+    "device_count": 385,
+    "median_minutes_to_stadium": 25.3,
+    "median_minutes_from_stadium": 20.8,
+    "local_pct": 61.8,
+    "visitor_pct": 34.0,
+    "unknown_pct": 4.3,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot B",
+    "device_count": 372,
+    "median_minutes_to_stadium": 17.1,
+    "median_minutes_from_stadium": 19.2,
+    "local_pct": 44.5,
+    "visitor_pct": 51.7,
+    "unknown_pct": 3.9,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lots F&G",
+    "device_count": 319,
+    "median_minutes_to_stadium": 17.6,
+    "median_minutes_from_stadium": 23.9,
+    "local_pct": 63.8,
+    "visitor_pct": 33.4,
+    "unknown_pct": 2.8,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot E",
+    "device_count": 175,
+    "median_minutes_to_stadium": 7.9,
+    "median_minutes_from_stadium": 10.4,
+    "local_pct": 51.1,
+    "visitor_pct": 46.9,
+    "unknown_pct": 2.0,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot H",
+    "device_count": 151,
+    "median_minutes_to_stadium": 25.9,
+    "median_minutes_from_stadium": 25.2,
+    "local_pct": 60.8,
+    "visitor_pct": 32.5,
+    "unknown_pct": 6.7,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot W",
+    "device_count": 97,
+    "median_minutes_to_stadium": 12.6,
+    "median_minutes_from_stadium": 23.6,
+    "local_pct": 68.2,
+    "visitor_pct": 28.3,
+    "unknown_pct": 3.4,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lot 5",
+    "device_count": 80,
+    "median_minutes_to_stadium": 25.3,
+    "median_minutes_from_stadium": 44.1,
+    "local_pct": 58.8,
+    "visitor_pct": 37.6,
+    "unknown_pct": 3.5,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Staybridge Suites",
+    "device_count": 72,
+    "median_minutes_to_stadium": 28.2,
+    "median_minutes_from_stadium": 16.7,
+    "local_pct": 59.7,
+    "visitor_pct": 38.7,
+    "unknown_pct": 1.6,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Holiday Inn Express",
+    "device_count": 61,
+    "median_minutes_to_stadium": 38.0,
+    "median_minutes_from_stadium": 1.3,
+    "local_pct": 44.8,
+    "visitor_pct": 53.4,
+    "unknown_pct": 1.8,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Courtyard Inn",
+    "device_count": 55,
+    "median_minutes_to_stadium": 28.0,
+    "median_minutes_from_stadium": 3.6,
+    "local_pct": 37.3,
+    "visitor_pct": 53.8,
+    "unknown_pct": 8.8,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Fairfield Inn & Suites",
+    "device_count": 45,
+    "median_minutes_to_stadium": 40.5,
+    "median_minutes_from_stadium": 34.2,
+    "local_pct": 46.1,
+    "visitor_pct": 53.5,
+    "unknown_pct": 0.4,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Residence Inn",
+    "device_count": 44,
+    "median_minutes_to_stadium": 27.9,
+    "median_minutes_from_stadium": 1.0,
+    "local_pct": 26.7,
+    "visitor_pct": 66.3,
+    "unknown_pct": 7.0,
+    "confidence": "ok"
+  },
+  {
+    "lot": "Lots T&V",
+    "device_count": 33,
+    "median_minutes_to_stadium": 26.2,
+    "median_minutes_from_stadium": 1.9,
+    "local_pct": 47.4,
+    "visitor_pct": 50.5,
+    "unknown_pct": 2.1,
+    "confidence": "low"
+  },
+  {
+    "lot": "South Rideshare",
+    "device_count": 24,
+    "median_minutes_to_stadium": 31.2,
+    "median_minutes_from_stadium": 34.4,
+    "local_pct": 52.1,
+    "visitor_pct": 44.7,
+    "unknown_pct": 3.2,
+    "confidence": "low"
+  },
+  {
+    "lot": "Garage V",
+    "device_count": 10,
+    "median_minutes_to_stadium": 21.3,
+    "median_minutes_from_stadium": 25.4,
+    "local_pct": 41.2,
+    "visitor_pct": 52.9,
+    "unknown_pct": 5.9,
+    "confidence": "low"
+  },
+  {
+    "lot": "Lot 5 (A)",
+    "device_count": 9,
+    "median_minutes_to_stadium": 35.1,
+    "median_minutes_from_stadium": 44.6,
+    "local_pct": 65.2,
+    "visitor_pct": 32.6,
+    "unknown_pct": 2.2,
+    "confidence": "low"
+  },
+  {
+    "lot": "Lot U",
+    "device_count": 8,
+    "median_minutes_to_stadium": 35.2,
+    "median_minutes_from_stadium": null,
+    "local_pct": 36.4,
+    "visitor_pct": 63.6,
+    "unknown_pct": 0.0,
+    "confidence": "low"
+  },
+  {
+    "lot": "Lot Z",
+    "device_count": 5,
+    "median_minutes_to_stadium": 31.8,
+    "median_minutes_from_stadium": null,
+    "local_pct": 66.7,
+    "visitor_pct": 16.7,
+    "unknown_pct": 16.7,
+    "confidence": "low"
+  }
+]
