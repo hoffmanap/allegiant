@@ -164,8 +164,17 @@ python pathing_pipeline.py \
   --stadium-name "Allegiant Stadium" \
   --lots "Lot A" "Lot B" "Lot C" \
   --max-post-minutes 60 \
+  --event-name "Raiders vs. Chiefs (2026-09-14)" \
+  --event-type nfl_home_game \
+  --event-date 2026-09-14 \
   --out output/
 ```
+
+`--event-name` / `--event-type` / `--event-date` are optional but recommended
+whenever you process a new game or event — they get written to
+`output/event_meta.json` and, once bundled into that run's
+`dashboard_data.json` (see §7), let the dashboard's event-comparison file
+picker label the overlay correctly instead of just showing the filename.
 
 To try the pipeline without real data first:
 
@@ -183,11 +192,12 @@ This writes five files to `output/`:
 | `lot_summary.json` | Per-lot aggregate stats: device count, median times, local/visitor split, confidence flag |
 | `lot_centroids.json` | Lat/lon for each lot (from the real polygon geometry) and the stadium, for map markers |
 | `pipeline_stats.json` | Funnel counts and notes on what was dropped and why |
+| `event_meta.json` | `--event-name` / `--event-type` / `--event-date`, for multi-event comparison |
 
 ## 7. Rebuilding the dashboard
 
-`index.html` reads its data from a single embedded JSON blob. To refresh it
-after a new pipeline run:
+`index.html` reads its data from two embedded placeholders in
+`index_template.html`. To refresh it after a new pipeline run:
 
 ```bash
 python3 - <<'EOF'
@@ -198,8 +208,17 @@ data = {
     "lot_summary": json.load(open("output/lot_summary.json")),
     "routes": json.load(open("output/routes.json")),
 }
+event_meta = json.load(open("output/event_meta.json"))
+data["event_meta"] = event_meta  # so a saved dashboard_data.json can be
+                                  # loaded into another run's comparison picker
 html = open("index_template.html").read()
-open("index.html", "w").write(html.replace("__DASHBOARD_DATA__", json.dumps(data)))
+html = html.replace("__DASHBOARD_DATA__", json.dumps(data))
+html = html.replace("__EVENT_META__", json.dumps(event_meta))
+open("index.html", "w").write(html)
+
+# Also save a standalone bundle -- this is the file to hand to the
+# "Compare against another event" picker in a *different* game's dashboard.
+json.dump(data, open("output/dashboard_data.json", "w"))
 EOF
 ```
 
@@ -207,18 +226,46 @@ Open `index.html` directly in a browser — no server required.
 
 ## 8. The interface
 
-- **Scrollytelling rail** (left): narrative steps that drive the map as the
-  reader scrolls. Lot names and "local"/"visitor" appear as colored inline
-  spans; clicking one jumps the map to that filter immediately.
-- **Sticky map** (right): Leaflet, dark basemap, one colored dot per lot,
-  route lines colored by direction (amber = walking in, red = walking out),
-  line weight scaled by device count.
-- **Control panel**: lot chips for multi-select aggregation, a
-  local/visitor/all toggle, and a sortable summary table for open-ended
-  exploration.
+- **Narrative rail** (left, scrolls): a short guided intro that highlights
+  different lot/residency views as you scroll. Clicking a highlighted word,
+  or touching any control in the side panel, switches to manual mode — the
+  guided tour stops overriding your selection, so nothing resets as you
+  scroll back up.
+- **Side panel** (right, sticky): map, lot picker, residency toggle, and
+  charts all live in one fixed frame for the entire scroll, so filters and
+  the map are always visible together.
+- **Street snapping** (map toggle): best-effort routing of the drawn paths
+  onto real streets/sidewalks via OSRM's public routing API, called directly
+  from the browser. Off by default; toggle on to try it. Falls back silently
+  to the raw GPS-derived path per route if the service is unavailable or
+  returns no match — a status line under the toggle reports how many routes
+  snapped successfully.
+- **Charts, not just a table**: devices-per-lot and local/visitor-split bar
+  charts update live with your filters; a time-to-stadium histogram (5 or 10
+  minute bins) shows the distribution of walk times for the current
+  selection.
+- **Event comparison**: drop another event's `dashboard_data.json` (produced
+  by the same pipeline, ideally with `--event-name` / `--event-type` set) into
+  the file picker to overlay its time-to-stadium distribution on the
+  histogram — e.g. comparing a Raiders home game against a concert once both
+  have been processed.
 
 ## 9. Known limitations
 
+- **Street snapping is a demo-tier convenience, not a production routing
+  layer.** It calls OSRM's free public API directly from the visitor's
+  browser (`router.project-osrm.org`) with no authentication and no SLA —
+  expect occasional timeouts or rate-limiting, especially with many lots
+  selected at once. Results are not cached beyond the current browser
+  session. For a public-facing or high-traffic deployment, replace this
+  with a self-hosted OSRM instance or a paid map-matching API (e.g. Mapbox),
+  and precompute/cache the matched geometry server-side rather than calling
+  it live per page load.
+- **Event comparison depends on consistent pipeline runs.** The histogram
+  overlay only works well if every event was processed with the same lot
+  boundaries and the same `--max-post-minutes` window; comparing a 60-minute
+  window against a 30-minute window will look like a real behavioral
+  difference when it's actually a methodology difference.
 - **Route geometry is grid-snapped, not map-matched.** `flow_lines.json`
   groups routes whose points fall in the same coarse cell (~90m,
   `snap_route_to_grid`) and shows one representative path per cluster,
