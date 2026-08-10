@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Walk In — Routes to Allegiant Stadium</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+
+/* ---------------------------------------------------------------- */
+/* TOKENS                                                            */
+/* ---------------------------------------------------------------- */
+:root{
+  --field-black:#0c0d10;
+  --night-navy:#12151c;
+  --panel:#181b23;
+  --line:#2a2e38;
+  --paper:#f1ede4;
+  --silver:#c9cdd6;
+  --allegiant-red:#a6192e;
+  --torch-amber:#ffb648;
+  --local-teal:#3ec9a7;
+  --visitor-violet:#b98cf2;
+  --muted:#7d8394;
+  --display: "Oswald", "Arial Narrow", sans-serif;
+  --body: "Source Serif 4", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@font-face{font-family:"Oswald";src:local("Oswald");}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--field-black);
+  color:var(--paper);
+  font-family:var(--body);
+  line-height:1.6;
+}
+::selection{background:var(--allegiant-red);color:#fff;}
+
+a{color:var(--torch-amber);}
+
+/* ---------------------------------------------------------------- */
+/* MASTHEAD                                                          */
+/* ---------------------------------------------------------------- */
+.masthead{
+  padding:9vh 6vw 8vh;
+  max-width:1000px;
+  border-bottom:1px solid var(--line);
+}
+.kicker{
+  font-family:var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:.72rem;
+  color:var(--torch-amber);
+  margin:0 0 1.4rem;
+}
+.kicker::before{content:"● ";color:var(--allegiant-red);}
+h1.title{
+  font-family:var(--display);
+  font-weight:600;
+  text-transform:uppercase;
+  font-size:clamp(2.6rem,7vw,5.4rem);
+  line-height:.96;
+  letter-spacing:.005em;
+  margin:0 0 1.6rem;
+}
+h1.title em{
+  font-style:normal;
+  color:var(--allegiant-red);
+}
+.dek{
+  font-size:1.22rem;
+  max-width:640px;
+  color:var(--silver);
+  margin:0;
+}
+.dek b{color:var(--paper);font-weight:600;}
+.byline{
+  font-family:var(--mono);
+  font-size:.78rem;
+  color:var(--muted);
+  margin-top:2.2rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+/* ---------------------------------------------------------------- */
+/* SCROLLY LAYOUT: sticky map + narrative rail                       */
+/* ---------------------------------------------------------------- */
+.scrolly{
+  display:grid;
+  grid-template-columns:minmax(320px,42%) 1fr;
+  min-height:100vh;
+}
+.narrative-rail{
+  padding:6vh 5vw 40vh;
+  border-right:1px solid var(--line);
+}
+.step{
+  max-width:520px;
+  padding:2.4rem 0;
+  border-bottom:1px dashed var(--line);
+  opacity:.45;
+  transition:opacity .35s ease;
+}
+.step:last-child{border-bottom:none;}
+.step.is-active{opacity:1;}
+.step .eyebrow{
+  font-family:var(--mono);
+  font-size:.7rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin:0 0 .6rem;
+}
+.step h2{
+  font-family:var(--display);
+  text-transform:uppercase;
+  font-weight:600;
+  font-size:1.5rem;
+  letter-spacing:.01em;
+  margin:0 0 .9rem;
+}
+.step p{margin:0 0 .9rem;color:var(--silver);font-size:1.02rem;}
+.hl{
+  padding:.05em .35em;
+  border-radius:3px;
+  font-weight:600;
+  color:var(--field-black);
+  cursor:pointer;
+  transition:filter .15s ease;
+}
+.hl:hover{filter:brightness(1.15);}
+.step.is-active .hl{box-shadow:0 0 0 2px var(--field-black), 0 0 0 3px currentColor;}
+
+.map-stage{
+  position:sticky;
+  top:0;
+  height:100vh;
+  background:var(--night-navy);
+  border-left:1px solid var(--line);
+}
+#map{position:absolute;inset:0;}
+
+.map-hud{
+  position:absolute;
+  top:1.2rem;
+  right:1.2rem;
+  z-index:500;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:1rem 1.1rem;
+  width:230px;
+  font-family:var(--mono);
+  font-size:.78rem;
+  backdrop-filter:blur(6px);
+}
+.map-hud h3{
+  margin:0 0 .6rem;
+  font-family:var(--display);
+  text-transform:uppercase;
+  font-size:.82rem;
+  letter-spacing:.08em;
+  color:var(--torch-amber);
+  font-weight:600;
+}
+.hud-row{display:flex;justify-content:space-between;margin-bottom:.3rem;color:var(--silver);}
+.hud-row b{color:var(--paper);}
+.hud-note{color:var(--muted);margin-top:.6rem;font-size:.7rem;line-height:1.4;}
+
+.legend{
+  position:absolute;
+  bottom:1.2rem;
+  left:1.2rem;
+  z-index:500;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:.8rem 1rem;
+  font-family:var(--mono);
+  font-size:.72rem;
+  color:var(--silver);
+  display:flex;
+  gap:1.1rem;
+}
+.legend span{display:flex;align-items:center;gap:.4rem;}
+.swatch{width:14px;height:3px;border-radius:2px;display:inline-block;}
+
+/* ---------------------------------------------------------------- */
+/* CONTROL PANEL (lot picker / local-visitor)                        */
+/* ---------------------------------------------------------------- */
+.control-panel{
+  max-width:1400px;
+  margin:0 auto;
+  padding:7vh 6vw 4vh;
+  border-top:1px solid var(--line);
+}
+.control-panel .kicker{margin-bottom:1rem;}
+.panel-head h2{
+  font-family:var(--display);
+  text-transform:uppercase;
+  font-weight:600;
+  font-size:2rem;
+  margin:0 0 .5rem;
+}
+.panel-head p{color:var(--silver);max-width:640px;margin:0 0 2.4rem;}
+
+.controls-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:3rem;
+  margin-bottom:2.6rem;
+}
+.control-group h4{
+  font-family:var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  font-size:.75rem;
+  color:var(--torch-amber);
+  margin:0 0 1rem;
+}
+.lot-toggles{display:flex;flex-wrap:wrap;gap:.6rem;}
+.lot-chip{
+  font-family:var(--mono);
+  font-size:.82rem;
+  padding:.5rem .9rem;
+  border-radius:99px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  color:var(--silver);
+  cursor:pointer;
+  transition:all .15s ease;
+  user-select:none;
+}
+.lot-chip.active{
+  color:var(--field-black);
+  border-color:transparent;
+  font-weight:700;
+}
+.residency-toggle{display:flex;gap:.6rem;}
+.res-btn{
+  font-family:var(--mono);
+  font-size:.82rem;
+  padding:.5rem 1rem;
+  border-radius:6px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  color:var(--silver);
+  cursor:pointer;
+}
+.res-btn.active{background:var(--allegiant-red);border-color:var(--allegiant-red);color:#fff;}
+
+.summary-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.85rem;}
+.summary-table th{
+  text-align:left;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-size:.68rem;
+  color:var(--muted);
+  border-bottom:1px solid var(--line);
+  padding:.6rem .8rem;
+}
+.summary-table td{
+  padding:.7rem .8rem;
+  border-bottom:1px solid var(--line);
+  color:var(--silver);
+}
+.summary-table tr:hover td{color:var(--paper);}
+.summary-table td.num{text-align:right;}
+.confidence-low{color:var(--torch-amber);}
+
+/* ---------------------------------------------------------------- */
+/* FOOTNOTE                                                           */
+/* ---------------------------------------------------------------- */
+footer{
+  max-width:900px;
+  margin:0 auto;
+  padding:5vh 6vw 10vh;
+  color:var(--muted);
+  font-size:.85rem;
+  border-top:1px solid var(--line);
+}
+footer code{
+  background:var(--panel);
+  padding:.1em .4em;
+  border-radius:3px;
+  font-family:var(--mono);
+  color:var(--silver);
+}
+
+@media (max-width: 860px){
+  .scrolly{grid-template-columns:1fr;}
+  .map-stage{position:relative;height:60vh;order:-1;}
+  .narrative-rail{padding:4vh 6vw 6vh;border-right:none;}
+  .controls-grid{grid-template-columns:1fr;gap:1.6rem;}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <p class="kicker">Mobility analysis · Las Vegas, NV</p>
+  <h1 class="title">The Walk In<br><em>Routes to Allegiant Stadium</em></h1>
+  <p class="dek">Anonymized device pings trace how fans actually move from
+    event parking to kickoff — and back out again. This piece isolates
+    <b>trips that begin in a lot and end at the stadium within an hour</b>,
+    strips out everything else as noise, and lets you compare how
+    <b>locals</b> and <b>visitors</b> take different paths in.</p>
+  <p class="byline">Source: Azira Pinnacle pathing &amp; visitation reports · anonymized, device-level GPS</p>
+</header>
+
+<section class="scrolly">
+  <div class="narrative-rail" id="narrative-rail">
+
+    <div class="step" data-lots="all" data-residency="all">
+      <p class="eyebrow">01 — The full picture</p>
+      <h2>Every qualifying trip, every lot</h2>
+      <p>Each line on the map is a real walking route, reconstructed from
+        sequential GPS pings, from a parking lot to a confirmed stadium
+        arrival — no more than <span class="hl" style="background:var(--torch-amber)">60 minutes</span>
+        after leaving the lot. Anything slower, or that never reached the
+        stadium at all, was dropped as noise before this map was drawn.</p>
+      <p>Line thickness is weighted by how many devices took a
+        near-identical path, so the boldest lines are the routes most people
+        actually walk — not just the shortest one on paper.</p>
+    </div>
+
+    <div class="step" data-lots="Silver Lot" data-residency="all">
+      <p class="eyebrow">02 — Lot by lot</p>
+      <h2>Isolating a single lot</h2>
+      <p>Click any lot in the narrative or the picker below to isolate it.
+        Here's <span class="hl" data-lot="Silver Lot">Silver Lot</span> on
+        its own — the routes fan out toward different stadium gates rather
+        than collapsing onto a single path, which is typical of surface
+        lots with more than one plausible walking approach.</p>
+    </div>
+
+    <div class="step" data-lots="Orange Lot" data-residency="all">
+      <p class="eyebrow">03 — Lot by lot</p>
+      <h2>A lot on the other side</h2>
+      <p><span class="hl" data-lot="Orange Lot">Orange Lot</span> sits on the
+        opposite approach. Compare its route bundle to Silver's — a
+        meaningfully different bearing on the map usually means a different
+        entry gate is absorbing most of that lot's foot traffic.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="local">
+      <p class="eyebrow">04 — Locals vs. visitors</p>
+      <h2>How locals walk in</h2>
+      <p>Devices are classified by their <b>Common Evening Location</b> —
+        Azira's home-location proxy built from a rolling three-month
+        history. Filtering to <span class="hl" data-res="local">locals</span>
+        surfaces whether people who live in the Las Vegas metro favor
+        different, often faster or more familiar, paths than out-of-town
+        visitors.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="visitor">
+      <p class="eyebrow">05 — Locals vs. visitors</p>
+      <h2>How visitors walk in</h2>
+      <p>Now the same lots, filtered to <span class="hl" data-res="visitor">visitors</span>
+        only. Watch the HUD on the right — visitor trips often run a few
+        minutes slower on average, consistent with less familiarity with
+        the fastest walking path from a given lot.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="all">
+      <p class="eyebrow">06 — Explore</p>
+      <h2>Build your own view</h2>
+      <p>Use the picker below to select any combination of lots, toggle
+        between locals and visitors, and read the aggregate stats for
+        exactly the slice you're interested in.</p>
+    </div>
+
+  </div>
+
+  <div class="map-stage">
+    <div id="map"></div>
+    <div class="map-hud" id="map-hud">
+      <h3>Selection</h3>
+      <div class="hud-row"><span>Devices</span><b id="hud-devices">–</b></div>
+      <div class="hud-row"><span>Median time in</span><b id="hud-time-in">–</b></div>
+      <div class="hud-row"><span>Median time out</span><b id="hud-time-out">–</b></div>
+      <div class="hud-row"><span>Local</span><b id="hud-local">–</b></div>
+      <div class="hud-row"><span>Visitor</span><b id="hud-visitor">–</b></div>
+      <div class="hud-note" id="hud-note"></div>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--torch-amber)"></i>To stadium</span>
+      <span><i class="swatch" style="background:var(--allegiant-red)"></i>From stadium</span>
+    </div>
+  </div>
+</section>
+
+<section class="control-panel">
+  <p class="kicker">Interactive</p>
+  <div class="panel-head">
+    <h2>Pick your lots</h2>
+    <p>Select one lot to study it in isolation, or several to see an
+      aggregated view. The map, HUD, and table below update together.</p>
+  </div>
+
+  <div class="controls-grid">
+    <div class="control-group">
+      <h4>Parking lots</h4>
+      <div class="lot-toggles" id="lot-toggles"></div>
+    </div>
+    <div class="control-group">
+      <h4>Residency</h4>
+      <div class="residency-toggle" id="residency-toggle">
+        <button class="res-btn active" data-res="all">All devices</button>
+        <button class="res-btn" data-res="local">Locals only</button>
+        <button class="res-btn" data-res="visitor">Visitors only</button>
+      </div>
+    </div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Lot</th>
+        <th class="num">Devices</th>
+        <th class="num">Median min → stadium</th>
+        <th class="num">Median min → lot</th>
+        <th class="num">Local %</th>
+        <th class="num">Visitor %</th>
+        <th class="num">Confidence</th>
+      </tr>
+    </thead>
+    <tbody id="summary-body"></tbody>
+  </table>
+</section>
+
+<footer>
+  <p><b>Methodology.</b> Trips are reconstructed from an Azira Pinnacle
+    Pathing X export joined against a Pin report confirming an actual
+    stadium visit. A device only appears here if it pinged inside a
+    selected lot polygon and reached the stadium within the study's
+    60-minute post-window; devices that entered a lot but never showed a
+    confirmed stadium arrival in that window were treated as noise and
+    excluded. Residency (local vs. visitor) is derived from each device's
+    Common Evening Location relative to the Las Vegas–Henderson–Paradise
+    metro area. Lots with fewer than <code>38</code> qualifying devices are
+    flagged <span class="confidence-low">low confidence</span>, mirroring
+    Azira's own minimum-device threshold for reliable aggregate shapes.
+    Full field definitions and pipeline logic are in
+    <code>README.md</code> and <code>pathing_pipeline.py</code>.</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================== */
+/* DATA                                                             */
+/* ============================================================== */
+const DASHBOARD_DATA = __DASHBOARD_DATA__;
+
+const LOT_COLORS = {};
+const PALETTE = ["#ffb648","#3ec9a7","#b98cf2","#e0664a","#6fb1ff","#f2d24f"];
+Object.keys(DASHBOARD_DATA.lot_centroids.lots).forEach((lot,i)=>{
+  LOT_COLORS[lot] = PALETTE[i % PALETTE.length];
+});
+
+/* ============================================================== */
+/* MAP SETUP                                                        */
+/* ============================================================== */
+const stadium = DASHBOARD_DATA.lot_centroids.stadium;
+const map = L.map('map', {zoomControl:true, scrollWheelZoom:true})
+  .setView([stadium.lat, stadium.lon], 14.3);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; OpenStreetMap &copy; CARTO',
+  subdomains:'abcd', maxZoom:19
+}).addTo(map);
+
+L.circleMarker([stadium.lat, stadium.lon], {
+  radius:9, color:'#fff', weight:2, fillColor:'#a6192e', fillOpacity:1
+}).addTo(map).bindTooltip("Allegiant Stadium", {permanent:false});
+
+const lotMarkers = {};
+Object.entries(DASHBOARD_DATA.lot_centroids.lots).forEach(([lot, c])=>{
+  const m = L.circleMarker([c.lat, c.lon], {
+    radius:7, color:'#0c0d10', weight:2,
+    fillColor: LOT_COLORS[lot], fillOpacity:1
+  }).addTo(map).bindTooltip(lot);
+  lotMarkers[lot] = m;
+});
+
+let routeLayer = L.layerGroup().addTo(map);
+
+function residencyForDevice(deviceId){
+  // routes already carry residency per-trip; build lookup once
+  return DASHBOARD_DATA._deviceResidency[deviceId] || 'unknown';
+}
+DASHBOARD_DATA._deviceResidency = {};
+DASHBOARD_DATA.routes.forEach(r=>{ DASHBOARD_DATA._deviceResidency[r.device_id] = r.residency; });
+
+function renderMap(selectedLots, residencyFilter){
+  routeLayer.clearLayers();
+  const allLots = Object.keys(DASHBOARD_DATA.lot_centroids.lots);
+  const lots = (selectedLots === 'all' || !selectedLots.length) ? allLots : selectedLots;
+
+  let totalDevices = new Set();
+  let toTimes = [], fromTimes = [];
+  let localCount=0, visitorCount=0, totalCount=0;
+
+  lots.forEach(lot=>{
+    ['to_stadium','from_stadium'].forEach(direction=>{
+      const key = lot + '||' + direction;
+      const lines = DASHBOARD_DATA.flow_lines[key] || [];
+      lines.forEach(line=>{
+        // residency filter: approximate by filtering underlying routes,
+        // then only draw flow lines that still have members after filter
+        const color = direction === 'to_stadium' ? '#ffb648' : '#a6192e';
+        const weight = Math.max(1.5, Math.min(7, line.device_count/4));
+        L.polyline(line.path, {
+          color: color, weight: weight, opacity:.78, lineCap:'round'
+        }).addTo(routeLayer)
+          .bindTooltip(`${lot} · ${direction.replace('_',' ')} · ${line.device_count} devices · ~${line.avg_minutes_to_stadium} min`);
+      });
+    });
+  });
+
+  // HUD stats computed from raw routes (respects residency filter precisely)
+  DASHBOARD_DATA.routes.forEach(r=>{
+    if(!lots.includes(r.lot)) return;
+    if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    totalDevices.add(r.device_id);
+    if(r.direction === 'to_stadium') toTimes.push(r.minutes_to_stadium);
+    else fromTimes.push(r.minutes_to_stadium);
+    totalCount++;
+    if(r.residency === 'local') localCount++;
+    if(r.residency === 'visitor') visitorCount++;
+  });
+
+  const median = arr => {
+    if(!arr.length) return null;
+    const s = [...arr].sort((a,b)=>a-b);
+    const mid = Math.floor(s.length/2);
+    return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+  };
+
+  document.getElementById('hud-devices').textContent = totalDevices.size;
+  document.getElementById('hud-time-in').textContent = toTimes.length ? median(toTimes).toFixed(0)+' min' : '–';
+  document.getElementById('hud-time-out').textContent = fromTimes.length ? median(fromTimes).toFixed(0)+' min' : '–';
+  document.getElementById('hud-local').textContent = totalCount ? Math.round(100*localCount/totalCount)+'%' : '–';
+  document.getElementById('hud-visitor').textContent = totalCount ? Math.round(100*visitorCount/totalCount)+'%' : '–';
+  document.getElementById('hud-note').textContent =
+    lots.length === allLots.length ? 'All lots selected' : lots.join(', ');
+
+  // dim/highlight lot markers
+  allLots.forEach(lot=>{
+    const active = lots.includes(lot);
+    lotMarkers[lot].setStyle({fillOpacity: active ? 1 : .25, opacity: active ? 1 : .25});
+  });
+}
+
+/* ============================================================== */
+/* SUMMARY TABLE                                                    */
+/* ============================================================== */
+function renderTable(){
+  const tbody = document.getElementById('summary-body');
+  tbody.innerHTML = '';
+  DASHBOARD_DATA.lot_summary.forEach(row=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><i class="swatch" style="background:${LOT_COLORS[row.lot]};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5em;"></i>${row.lot}</td>
+      <td class="num">${row.device_count}</td>
+      <td class="num">${row.median_minutes_to_stadium ?? '–'}</td>
+      <td class="num">${row.median_minutes_from_stadium ?? '–'}</td>
+      <td class="num">${row.local_pct}%</td>
+      <td class="num">${row.visitor_pct}%</td>
+      <td class="num ${row.confidence==='low' ? 'confidence-low' : ''}">${row.confidence}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ============================================================== */
+/* LOT PICKER + RESIDENCY TOGGLE                                    */
+/* ============================================================== */
+const allLotNames = Object.keys(DASHBOARD_DATA.lot_centroids.lots);
+let activeLots = new Set(allLotNames);
+let activeResidency = 'all';
+
+const lotToggleContainer = document.getElementById('lot-toggles');
+allLotNames.forEach(lot=>{
+  const chip = document.createElement('div');
+  chip.className = 'lot-chip active';
+  chip.textContent = lot;
+  chip.style.background = LOT_COLORS[lot];
+  chip.style.color = '#0c0d10';
+  chip.dataset.lot = lot;
+  chip.addEventListener('click', ()=>{
+    if(activeLots.has(lot)){
+      activeLots.delete(lot);
+      chip.classList.remove('active');
+      chip.style.background = 'var(--panel)';
+      chip.style.color = 'var(--silver)';
+    } else {
+      activeLots.add(lot);
+      chip.classList.add('active');
+      chip.style.background = LOT_COLORS[lot];
+      chip.style.color = '#0c0d10';
+    }
+    renderMap([...activeLots], activeResidency);
+  });
+  lotToggleContainer.appendChild(chip);
+});
+
+document.querySelectorAll('.res-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.res-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeResidency = btn.dataset.res;
+    renderMap([...activeLots], activeResidency);
+  });
+});
+
+/* ============================================================== */
+/* SCROLLYTELLING (IntersectionObserver-driven steps)                */
+/* ============================================================== */
+const steps = document.querySelectorAll('.step');
+const stepObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      steps.forEach(s=>s.classList.remove('is-active'));
+      entry.target.classList.add('is-active');
+      const lotsAttr = entry.target.dataset.lots;
+      const resAttr = entry.target.dataset.residency || 'all';
+      const lots = lotsAttr === 'all' ? allLotNames : [lotsAttr];
+
+      // sync picker UI to match the step
+      activeLots = new Set(lots);
+      document.querySelectorAll('.lot-chip').forEach(chip=>{
+        const on = activeLots.has(chip.dataset.lot);
+        chip.classList.toggle('active', on);
+        chip.style.background = on ? LOT_COLORS[chip.dataset.lot] : 'var(--panel)';
+        chip.style.color = on ? '#0c0d10' : 'var(--silver)';
+      });
+      activeResidency = resAttr;
+      document.querySelectorAll('.res-btn').forEach(b=>{
+        b.classList.toggle('active', b.dataset.res === resAttr);
+      });
+
+      renderMap(lots, resAttr);
+    }
+  });
+}, {root:null, threshold:0.55});
+steps.forEach(s=>stepObserver.observe(s));
+
+// clicking a highlighted inline span jumps the map without waiting to scroll
+document.querySelectorAll('.hl[data-lot]').forEach(span=>{
+  span.style.background = LOT_COLORS[span.dataset.lot] || 'var(--torch-amber)';
+  span.addEventListener('click', ()=>{
+    activeLots = new Set([span.dataset.lot]);
+    document.querySelectorAll('.lot-chip').forEach(chip=>{
+      const on = chip.dataset.lot === span.dataset.lot;
+      chip.classList.toggle('active', on);
+      chip.style.background = on ? LOT_COLORS[chip.dataset.lot] : 'var(--panel)';
+      chip.style.color = on ? '#0c0d10' : 'var(--silver)';
+    });
+    renderMap([span.dataset.lot], activeResidency);
+  });
+});
+document.querySelectorAll('.hl[data-res]').forEach(span=>{
+  span.style.background = span.dataset.res === 'local' ? 'var(--local-teal)' : 'var(--visitor-violet)';
+});
+
+/* ============================================================== */
+/* INITIAL RENDER                                                   */
+/* ============================================================== */
+renderMap('all', 'all');
+renderTable();
+</script>
+</body>
+</html>
