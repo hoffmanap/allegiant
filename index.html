@@ -266,6 +266,7 @@ h1.title em{font-style:normal;color:var(--allegiant-red);}
   background:none;border:1px solid var(--line);color:var(--muted);
   border-radius:5px;padding:.25rem .5rem;cursor:pointer;
 }
+.lot-chip-row button.active{border-color:var(--allegiant-red);color:var(--allegiant-red);background:rgba(166,25,46,.1);}
 
 .residency-toggle{display:flex;gap:.5rem;}
 .res-btn{
@@ -406,6 +407,7 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
       <div class="map-mode-toggle" id="map-mode-toggle">
         <button data-mode="volume" class="active">Volume</button>
         <button data-mode="residency">Local vs. Visitor</button>
+        <button data-mode="impact">Impact</button>
       </div>
       <div class="color-legend" id="color-legend">
         <div id="legend-label">Devices per segment</div>
@@ -455,7 +457,16 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
         <p class="chart-note" id="histogram-note"></p>
       </div>
 
-      <h4>Busiest district entry points</h4>
+      <h4>Trips by time of day</h4>
+      <p class="chart-note" id="tod-note"></p>
+      <div class="chart-wrap"><canvas id="chart-time-of-day"></canvas></div>
+
+      <h4>Busiest points</h4>
+      <div class="lot-chip-row" id="ranking-mode-toggle">
+        <button data-ranking="entry" class="active">Entry</button>
+        <button data-ranking="exit">Exit</button>
+        <button data-ranking="impact">Impact</button>
+      </div>
       <p class="chart-note" id="entry-points-note"></p>
       <div class="chart-wrap"><canvas id="chart-entry-points"></canvas></div>
 
@@ -560,8 +571,9 @@ let histogramBin = 5;
 /* selection actually affects the segment volumes shown.             */
 /* ============================================================== */
 function computeSegmentAggregates(lots, residencyFilter){
-  const segments = new Map(); // key -> {path, total, to_count, from_count, local, visitor, unknown}
-  const entryCounter = new Map(); // key -> {path, total, local, visitor, unknown}
+  const segments = new Map(); // key -> {path, total, to_count, from_count, local, visitor, unknown, sumMinutes}
+  const entryCounter = new Map(); // key -> {path, total, local, visitor, unknown} -- first edge of inbound trips
+  const exitCounter = new Map();  // key -> {path, total, local, visitor, unknown} -- last edge of outbound (return) trips
 
   PRIMARY_DATA.routes.forEach(r=>{
     if(!lots.includes(r.lot)) return;
@@ -572,15 +584,16 @@ function computeSegmentAggregates(lots, residencyFilter){
 
     new Set(uniqueInOrder).forEach(key=>{
       if(!EDGE_GEOMETRIES[key]) return;
-      if(!segments.has(key)) segments.set(key, {path: EDGE_GEOMETRIES[key], total:0, to_count:0, from_count:0, local:0, visitor:0, unknown:0});
+      if(!segments.has(key)) segments.set(key, {path: EDGE_GEOMETRIES[key], total:0, to_count:0, from_count:0, local:0, visitor:0, unknown:0, sumMinutes:0});
       const seg = segments.get(key);
       seg.total++;
       seg[r.direction === 'to_stadium' ? 'to_count' : 'from_count']++;
       seg[r.residency === 'local' ? 'local' : (r.residency === 'visitor' ? 'visitor' : 'unknown')]++;
+      seg.sumMinutes += (r.minutes_to_stadium || 0);
     });
 
     if(r.direction === 'to_stadium' && uniqueInOrder.length){
-      const key = uniqueInOrder[0];
+      const key = uniqueInOrder[0]; // entry: first street segment an inbound trip touches
       if(EDGE_GEOMETRIES[key]){
         if(!entryCounter.has(key)) entryCounter.set(key, {path: EDGE_GEOMETRIES[key], total:0, local:0, visitor:0, unknown:0});
         const ent = entryCounter.get(key);
@@ -588,14 +601,45 @@ function computeSegmentAggregates(lots, residencyFilter){
         ent[r.residency === 'local' ? 'local' : (r.residency === 'visitor' ? 'visitor' : 'unknown')]++;
       }
     }
+    if(r.direction === 'from_stadium' && uniqueInOrder.length){
+      const key = uniqueInOrder[uniqueInOrder.length - 1]; // exit: last street segment an outbound (return) trip touches
+      if(EDGE_GEOMETRIES[key]){
+        if(!exitCounter.has(key)) exitCounter.set(key, {path: EDGE_GEOMETRIES[key], total:0, local:0, visitor:0, unknown:0});
+        const ext = exitCounter.get(key);
+        ext.total++;
+        ext[r.residency === 'local' ? 'local' : (r.residency === 'visitor' ? 'visitor' : 'unknown')]++;
+      }
+    }
   });
+
+  segments.forEach(seg=>{ seg.avgMinutes = seg.total ? seg.sumMinutes / seg.total : 0; });
 
   const entryPoints = [...entryCounter.entries()]
     .map(([key, v])=>({key, ...v}))
     .sort((a,b)=>b.total - a.total)
     .slice(0, 15);
+  const exitPoints = [...exitCounter.entries()]
+    .map(([key, v])=>({key, ...v}))
+    .sort((a,b)=>b.total - a.total)
+    .slice(0, 15);
 
-  return {segments, entryPoints};
+  return {segments, entryPoints, exitPoints};
+}
+
+function computeImpactRanking(segments){
+  const arr = [...segments.values()];
+  if(!arr.length) return [];
+  const maxVol = Math.max(...arr.map(s=>s.total));
+  const maxTime = Math.max(...arr.map(s=>s.avgMinutes), 1);
+  arr.forEach(s=>{
+    const volNorm = s.total / maxVol;
+    const timeNorm = s.avgMinutes / maxTime;
+    // Multiplicative on purpose: a segment only scores high if it's BOTH
+    // heavily used AND part of slower-than-average trips -- a busy-but-fast
+    // segment, or a slow-but-rarely-used one, isn't the priority either way.
+    s.impactScore = volNorm * timeNorm;
+  });
+  return arr.sort((a,b)=>b.impactScore - a.impactScore).slice(0, 15);
 }
 
 /* ============================================================== */
@@ -628,24 +672,36 @@ function median(arr){
 }
 
 let mapMode = 'volume';
+let rankingMode = 'entry'; // 'entry' | 'exit' | 'impact' -- drives the ranked chart below the map
 let lastEntryPoints = [];
+let lastExitPoints = [];
+let lastSegments = new Map();
 
 function renderStreetSegments(lots, residencyFilter){
-  const {segments, entryPoints} = computeSegmentAggregates(lots, residencyFilter);
+  const {segments, entryPoints, exitPoints} = computeSegmentAggregates(lots, residencyFilter);
   lastEntryPoints = entryPoints;
+  lastExitPoints = exitPoints;
+  lastSegments = segments;
 
   const maxTotal = Math.max(1, ...[...segments.values()].map(s=>s.total));
+  const impactRanking = mapMode === 'impact' ? computeImpactRanking(segments) : [];
+  const maxImpact = Math.max(0.0001, ...impactRanking.map(s=>s.impactScore));
 
   segments.forEach(seg=>{
-    let color, dashClass;
+    let color, dashClass, weightBasis;
     if(mapMode === 'volume'){
       color = volumeColor(seg.total / maxTotal);
+      weightBasis = seg.total / maxTotal;
+    } else if(mapMode === 'impact'){
+      color = volumeColor(Math.min(1, seg.impactScore / maxImpact));
+      weightBasis = seg.impactScore / maxImpact;
     } else {
       const denom = seg.local + seg.visitor;
       const diff = denom ? (seg.local - seg.visitor) / denom : 0;
       color = residencyDiffColor(diff);
+      weightBasis = seg.total / maxTotal;
     }
-    const weight = Math.max(1.5, Math.min(8, 1.5 + 6 * (seg.total / maxTotal)));
+    const weight = Math.max(1.5, Math.min(8, 1.5 + 6 * weightBasis));
     dashClass = seg.to_count >= seg.from_count ? 'flow-to-stadium' : 'flow-from-stadium';
 
     L.polyline(seg.path, {color, weight, opacity:.85, lineCap:'round', className: dashClass})
@@ -653,12 +709,14 @@ function renderStreetSegments(lots, residencyFilter){
       .bindTooltip(
         `${seg.total} device${seg.total===1?'':'s'} on this segment<br>`+
         `→ stadium: ${seg.to_count} · ← stadium: ${seg.from_count}<br>`+
-        `local: ${seg.local} · visitor: ${seg.visitor}`
+        `local: ${seg.local} · visitor: ${seg.visitor}<br>`+
+        `avg trip time: ${seg.avgMinutes.toFixed(1)} min`+
+        (mapMode === 'impact' ? `<br><b>impact score: ${seg.impactScore.toFixed(2)}</b>` : '')
       );
   });
 
-  renderEntryPointsChart(entryPoints);
-  updateColorLegend(maxTotal);
+  renderRankedPointsChart();
+  updateColorLegend(maxTotal, impactRanking);
 }
 
 function renderStraightLineFallback(lots){
@@ -679,7 +737,7 @@ function renderStraightLineFallback(lots){
   });
 }
 
-function updateColorLegend(maxTotal){
+function updateColorLegend(maxTotal, impactRanking){
   const ramp = document.getElementById('legend-ramp');
   const label = document.getElementById('legend-label');
   const minEl = document.getElementById('legend-min');
@@ -689,6 +747,11 @@ function updateColorLegend(maxTotal){
     label.textContent = 'Devices per segment';
     minEl.textContent = '1';
     maxEl.textContent = String(maxTotal);
+  } else if(mapMode === 'impact'){
+    ramp.className = 'ramp';
+    label.textContent = 'Impact: volume × slowness';
+    minEl.textContent = 'low';
+    maxEl.textContent = 'high';
   } else {
     ramp.className = 'ramp diverge';
     label.textContent = 'Visitor-heavy ← → Local-heavy';
@@ -711,7 +774,7 @@ function renderMap(lotsInput, residencyFilter){
     document.getElementById('map-mode-toggle').style.display = 'none';
     document.getElementById('color-legend').style.display = 'none';
     renderStraightLineFallback(lots);
-    renderEntryPointsChart([]);
+    renderRankedPointsChart();
   }
 
   let deviceSet = new Set(), toTimes = [], fromTimes = [], localCount=0, visitorCount=0, totalCount=0;
@@ -750,6 +813,7 @@ function renderCharts(selectedLots, residencyFilter){
   renderDeviceChart(selectedLots);
   renderResidencyChart(selectedLots);
   renderHistogramChart(selectedLots, residencyFilter);
+  renderTimeOfDayChart(selectedLots, residencyFilter);
 }
 
 function renderDeviceChart(selectedLots){
@@ -803,39 +867,93 @@ function renderResidencyChart(selectedLots){
   residencyChart = new Chart(ctx, cfg);
 }
 
-function renderEntryPointsChart(entryPoints){
+function renderRankedPointsChart(){
   const ctx = document.getElementById('chart-entry-points');
   const noteEl = document.getElementById('entry-points-note');
-  if(!entryPoints.length){
+
+  if(!STREET_MATCH_AVAILABLE){
     if(entryPointsChart) entryPointsChart.destroy();
     entryPointsChart = null;
-    noteEl.textContent = STREET_MATCH_AVAILABLE
-      ? 'No entry points for the current selection.'
-      : 'Entry-point ranking needs street-matched data (re-run the pipeline with --street-match).';
+    noteEl.textContent = 'This ranking needs street-matched data (re-run the pipeline with --street-match).';
     return;
   }
-  noteEl.textContent = 'The first street segment each inbound trip touches -- i.e. where foot traffic enters the mapped street network on its way to the stadium.';
+
+  if(rankingMode === 'impact'){
+    const ranked = computeImpactRanking(lastSegments);
+    if(!ranked.length){
+      if(entryPointsChart) entryPointsChart.destroy();
+      entryPointsChart = null;
+      noteEl.textContent = 'No segments for the current selection.';
+      return;
+    }
+    noteEl.textContent = 'Segments scored by volume × how much slower-than-typical the trips touching them are — the streets where an infrastructure change would help the most people AND address the slowest journeys, not just one or the other.';
+    const cfg = {
+      type:'bar',
+      data:{
+        labels: ranked.map((e,i)=>`#${i+1}`),
+        datasets:[{ data: ranked.map(e=>e.impactScore), backgroundColor: '#a6192e' }]
+      },
+      options:{
+        indexAxis:'y', plugins:{legend:{display:false},
+          tooltip:{callbacks:{label: (ctx)=>{
+            const e = ranked[ctx.dataIndex];
+            return `${e.total} devices · avg ${e.avgMinutes.toFixed(1)} min · score ${e.impactScore.toFixed(2)}`;
+          }}}
+        },
+        scales:{
+          x:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{color:'#2a2e38'}},
+          y:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+        },
+        responsive:true, maintainAspectRatio:false,
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const e = ranked[elements[0].index];
+          map.flyToBounds(L.polyline(e.path).getBounds(), {maxZoom:18, duration:0.6});
+        }
+      }
+    };
+    if(entryPointsChart) entryPointsChart.destroy();
+    entryPointsChart = new Chart(ctx, cfg);
+    return;
+  }
+
+  const points = rankingMode === 'exit' ? lastExitPoints : lastEntryPoints;
+  if(!points.length){
+    if(entryPointsChart) entryPointsChart.destroy();
+    entryPointsChart = null;
+    noteEl.textContent = `No ${rankingMode} points for the current selection.`;
+    return;
+  }
+  noteEl.textContent = rankingMode === 'entry'
+    ? 'The first street segment each inbound trip touches -- where foot traffic enters the mapped street network on its way to the stadium, split by residency.'
+    : 'The last street segment each outbound (post-event) trip touches -- where foot traffic leaves the mapped street network heading back to a lot, split by residency.';
+
   const cfg = {
     type:'bar',
     data:{
-      labels: entryPoints.map((e,i)=>`#${i+1}`),
-      datasets:[{ data: entryPoints.map(e=>e.total), backgroundColor: '#ffb648' }]
+      labels: points.map((e,i)=>`#${i+1}`),
+      datasets:[
+        {label:'Local', data: points.map(e=>e.local), backgroundColor:'#3ec9a7'},
+        {label:'Visitor', data: points.map(e=>e.visitor), backgroundColor:'#b98cf2'},
+        {label:'Unknown', data: points.map(e=>e.unknown), backgroundColor:'#4a4f5c'},
+      ]
     },
     options:{
-      indexAxis:'y', plugins:{legend:{display:false},
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}},
         tooltip:{callbacks:{label: (ctx)=>{
-          const e = entryPoints[ctx.dataIndex];
-          return `${e.total} devices (local ${e.local}, visitor ${e.visitor})`;
+          const e = points[ctx.dataIndex];
+          return `${ctx.dataset.label}: ${ctx.raw} of ${e.total} total`;
         }}}
       },
       scales:{
-        x:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{color:'#2a2e38'}},
-        y:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+        x:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{color:'#2a2e38'}},
+        y:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
       },
-      responsive:true, maintainAspectRatio:false,
       onClick:(evt, elements)=>{
         if(!elements.length) return;
-        const e = entryPoints[elements[0].index];
+        const e = points[elements[0].index];
         map.flyToBounds(L.polyline(e.path).getBounds(), {maxZoom:18, duration:0.6});
       }
     }
@@ -889,6 +1007,55 @@ function renderHistogramChart(selectedLots, residencyFilter){
   document.getElementById('histogram-note').textContent = events.length > 1
     ? `Comparing ${events.length} events. Loaded events show all lots/residency; the primary event respects your current filters.`
     : 'Filtered to your current lot + residency selection, outbound (to-stadium) trips only.';
+}
+
+let timeOfDayChart;
+
+function renderTimeOfDayChart(selectedLots, residencyFilter){
+  const ctx = document.getElementById('chart-time-of-day');
+  const noteEl = document.getElementById('tod-note');
+
+  const toCounts = new Array(24).fill(0);
+  const fromCounts = new Array(24).fill(0);
+  let anyTimedTrips = false, untimedTrips = 0;
+
+  PRIMARY_DATA.routes.forEach(r=>{
+    if(!selectedLots.includes(r.lot)) return;
+    if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    if(r.departure_hour === null || r.departure_hour === undefined){
+      untimedTrips++;
+      return;
+    }
+    anyTimedTrips = true;
+    (r.direction === 'to_stadium' ? toCounts : fromCounts)[r.departure_hour]++;
+  });
+
+  const labels = Array.from({length:24}, (_,h)=> h.toString().padStart(2,'0') + ':00');
+  const cfg = {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Arriving (to stadium)', data: toCounts, backgroundColor:'#ffb648'},
+        {label:'Leaving (from stadium)', data: fromCounts, backgroundColor:'#a6192e'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}}},
+      scales:{
+        x:{ticks:{color:'#7d8394',font:{size:8}, maxRotation:0, autoSkip:true, maxTicksLimit:12}, grid:{display:false}},
+        y:{title:{display:true, text:'Devices', color:'#7d8394', font:{size:9}},
+           ticks:{color:'#7d8394',font:{size:9}}, grid:{color:'#2a2e38'}}
+      }
+    }
+  };
+  if(timeOfDayChart) timeOfDayChart.destroy();
+  timeOfDayChart = new Chart(ctx, cfg);
+
+  noteEl.textContent = anyTimedTrips
+    ? `Local (Pacific) time each trip began.${untimedTrips ? ` ${untimedTrips} trip(s) had no absolute timestamp available and aren't shown.` : ''}`
+    : 'No trips with a usable timestamp in the current selection -- this needs a pathing export with a real per-ping timestamp column (see README).';
 }
 
 /* ============================================================== */
@@ -963,6 +1130,15 @@ document.querySelectorAll('#map-mode-toggle button').forEach(btn=>{
     btn.classList.add('active');
     mapMode = btn.dataset.mode;
     renderMap([...activeLots], activeResidency);
+  });
+});
+
+document.querySelectorAll('#ranking-mode-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#ranking-mode-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    rankingMode = btn.dataset.ranking;
+    renderRankedPointsChart();
   });
 });
 
