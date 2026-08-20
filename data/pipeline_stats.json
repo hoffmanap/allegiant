@@ -1,15 +1,17 @@
 {
-  "raw_pings": 4921009,
-  "raw_devices": 126082,
-  "devices_with_lot_ping": 122335,
-  "devices_confirmed_stadium": 3655,
-  "devices_dropped_no_stadium": 118680,
+  "raw_pings": 2997668,
+  "raw_devices": 124275,
+  "devices_with_lot_ping": 122795,
+  "devices_confirmed_stadium": 5293,
+  "devices_dropped_no_stadium": 117502,
   "devices_dropped_employee": 0,
-  "devices_dropped_high_emittance": 1493,
+  "devices_dropped_repeat_visit_staff": 212,
+  "devices_dropped_high_emittance": 821,
   "devices_with_home": 470666,
-  "final_trips": 3708,
+  "final_trips": 4738,
   "notes": [
-    "Dropped 1493 device(s) exceeding 400 pings (high-emittance filter).",
-    "3655 of 122335 lot-visiting devices confirmed a stadium arrival within 60 minutes; 118680 dropped as noise (real timestamps; stadium confirmation via Pin report)."
+    "Dropped 821 device(s) exceeding 400 pings (high-emittance filter).",
+    "Repeat-visit staff detection: 212 devices appeared inside the stadium footprint on 5+ distinct dates -- flagged as likely staff and excluded. That's 0.04x the known 5785-person stadium workforce (plausible).",
+    "5293 of 122795 lot-visiting devices confirmed a stadium arrival within 150 minutes; 117502 dropped as noise (real timestamps; stadium confirmation via Pin report)."
   ]
 }

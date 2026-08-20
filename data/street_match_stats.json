@@ -1,0 +1,13 @@
+{
+  "pings_matched": 27597,
+  "pings_unmatched": 2588,
+  "pct_matched": 91.4,
+  "route_gap_bridging": {
+    "gaps_found": 14657,
+    "gaps_bridged": 12807,
+    "gaps_left_open": 1850,
+    "bridge_edges_added": 67895,
+    "gaps_left_open_no_path": 0,
+    "gaps_left_open_too_far": 1850
+  }
+}

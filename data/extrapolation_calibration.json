@@ -1,0 +1,278 @@
+{
+  "matched_dates": 38,
+  "pooled_sampling_rate_pct": 0.0882,
+  "mean_of_individual_rates_pct": 0.0936,
+  "std_of_individual_rates_pct": 0.0802,
+  "min_rate_pct": 0.016,
+  "max_rate_pct": 0.4019,
+  "extrapolation_multiplier": 1134.0,
+  "per_date": [
+    {
+      "date": "2025-01-05",
+      "name": "Raiders vs. Chargers",
+      "official_attendance": 51707,
+      "our_confirmed_devices": 30,
+      "sampling_rate_pct": 0.058
+    },
+    {
+      "date": "2025-01-18",
+      "name": "Inter Miami vs. Club America",
+      "official_attendance": 46089,
+      "our_confirmed_devices": 23,
+      "sampling_rate_pct": 0.0499
+    },
+    {
+      "date": "2025-03-01",
+      "name": "National Rugby League",
+      "official_attendance": 38107,
+      "our_confirmed_devices": 12,
+      "sampling_rate_pct": 0.0315
+    },
+    {
+      "date": "2025-03-29",
+      "name": "Mayday 5525",
+      "official_attendance": 15914,
+      "our_confirmed_devices": 11,
+      "sampling_rate_pct": 0.0691
+    },
+    {
+      "date": "2025-04-19",
+      "name": "WrestleMania 41 Day 1",
+      "official_attendance": 58538,
+      "our_confirmed_devices": 30,
+      "sampling_rate_pct": 0.0512
+    },
+    {
+      "date": "2025-04-20",
+      "name": "WrestleMania 41 Day 2",
+      "official_attendance": 60103,
+      "our_confirmed_devices": 50,
+      "sampling_rate_pct": 0.0832
+    },
+    {
+      "date": "2025-04-26",
+      "name": "AC/DC",
+      "official_attendance": 48899,
+      "our_confirmed_devices": 36,
+      "sampling_rate_pct": 0.0736
+    },
+    {
+      "date": "2025-05-03",
+      "name": "Post Malone",
+      "official_attendance": 53738,
+      "our_confirmed_devices": 42,
+      "sampling_rate_pct": 0.0782
+    },
+    {
+      "date": "2025-05-31",
+      "name": "Kendrick Lamar",
+      "official_attendance": 52328,
+      "our_confirmed_devices": 18,
+      "sampling_rate_pct": 0.0344
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Coldplay Night 1",
+      "official_attendance": 49950,
+      "our_confirmed_devices": 33,
+      "sampling_rate_pct": 0.0661
+    },
+    {
+      "date": "2025-06-07",
+      "name": "Coldplay Night 2",
+      "official_attendance": 50518,
+      "our_confirmed_devices": 30,
+      "sampling_rate_pct": 0.0594
+    },
+    {
+      "date": "2025-06-22",
+      "name": "Concacaf Gold Cup",
+      "official_attendance": 30073,
+      "our_confirmed_devices": 11,
+      "sampling_rate_pct": 0.0366
+    },
+    {
+      "date": "2025-06-28",
+      "name": "Shakira",
+      "official_attendance": 46120,
+      "our_confirmed_devices": 26,
+      "sampling_rate_pct": 0.0564
+    },
+    {
+      "date": "2025-07-05",
+      "name": "The Weeknd",
+      "official_attendance": 51103,
+      "our_confirmed_devices": 16,
+      "sampling_rate_pct": 0.0313
+    },
+    {
+      "date": "2025-07-25",
+      "name": "Beyonce Night 1",
+      "official_attendance": 43642,
+      "our_confirmed_devices": 7,
+      "sampling_rate_pct": 0.016
+    },
+    {
+      "date": "2025-07-26",
+      "name": "Beyonce Night 2",
+      "official_attendance": 49049,
+      "our_confirmed_devices": 21,
+      "sampling_rate_pct": 0.0428
+    },
+    {
+      "date": "2025-08-02",
+      "name": "Raiders Stadium Practice",
+      "official_attendance": 17295,
+      "our_confirmed_devices": 45,
+      "sampling_rate_pct": 0.2602
+    },
+    {
+      "date": "2025-08-16",
+      "name": "Raiders vs. 49ers",
+      "official_attendance": 54186,
+      "our_confirmed_devices": 56,
+      "sampling_rate_pct": 0.1033
+    },
+    {
+      "date": "2025-08-23",
+      "name": "UNLV vs. Idaho State",
+      "official_attendance": 16592,
+      "our_confirmed_devices": 14,
+      "sampling_rate_pct": 0.0844
+    },
+    {
+      "date": "2025-09-06",
+      "name": "UNLV vs. UCLA",
+      "official_attendance": 25433,
+      "our_confirmed_devices": 14,
+      "sampling_rate_pct": 0.055
+    },
+    {
+      "date": "2025-09-13",
+      "name": "Canelo vs. Crawford",
+      "official_attendance": 65302,
+      "our_confirmed_devices": 50,
+      "sampling_rate_pct": 0.0766
+    },
+    {
+      "date": "2025-09-15",
+      "name": "Raiders vs. Chargers",
+      "official_attendance": 58679,
+      "our_confirmed_devices": 26,
+      "sampling_rate_pct": 0.0443
+    },
+    {
+      "date": "2025-09-19",
+      "name": "Chris Brown Night 1",
+      "official_attendance": 42768,
+      "our_confirmed_devices": 22,
+      "sampling_rate_pct": 0.0514
+    },
+    {
+      "date": "2025-09-20",
+      "name": "Chris Brown Night 2",
+      "official_attendance": 46876,
+      "our_confirmed_devices": 48,
+      "sampling_rate_pct": 0.1024
+    },
+    {
+      "date": "2025-09-28",
+      "name": "Raiders vs. Bears",
+      "official_attendance": 59036,
+      "our_confirmed_devices": 83,
+      "sampling_rate_pct": 0.1406
+    },
+    {
+      "date": "2025-10-04",
+      "name": "Paul McCartney",
+      "official_attendance": 42926,
+      "our_confirmed_devices": 46,
+      "sampling_rate_pct": 0.1072
+    },
+    {
+      "date": "2025-10-11",
+      "name": "UNLV vs. Air Force",
+      "official_attendance": 18955,
+      "our_confirmed_devices": 69,
+      "sampling_rate_pct": 0.364
+    },
+    {
+      "date": "2025-10-12",
+      "name": "Raiders vs. Titans",
+      "official_attendance": 50402,
+      "our_confirmed_devices": 64,
+      "sampling_rate_pct": 0.127
+    },
+    {
+      "date": "2025-10-25",
+      "name": "HBCU Classic",
+      "official_attendance": 30149,
+      "our_confirmed_devices": 26,
+      "sampling_rate_pct": 0.0862
+    },
+    {
+      "date": "2025-11-01",
+      "name": "UNLV vs. New Mexico",
+      "official_attendance": 14374,
+      "our_confirmed_devices": 12,
+      "sampling_rate_pct": 0.0835
+    },
+    {
+      "date": "2025-11-02",
+      "name": "Raiders vs. Jaguars",
+      "official_attendance": 52401,
+      "our_confirmed_devices": 55,
+      "sampling_rate_pct": 0.105
+    },
+    {
+      "date": "2025-11-15",
+      "name": "UNLV vs. Utah State",
+      "official_attendance": 18187,
+      "our_confirmed_devices": 27,
+      "sampling_rate_pct": 0.1485
+    },
+    {
+      "date": "2025-11-17",
+      "name": "Raiders vs. Cowboys",
+      "official_attendance": 60327,
+      "our_confirmed_devices": 54,
+      "sampling_rate_pct": 0.0895
+    },
+    {
+      "date": "2025-11-21",
+      "name": "UNLV vs. Hawaii",
+      "official_attendance": 22755,
+      "our_confirmed_devices": 12,
+      "sampling_rate_pct": 0.0527
+    },
+    {
+      "date": "2025-11-23",
+      "name": "Raiders vs. Browns",
+      "official_attendance": 53749,
+      "our_confirmed_devices": 216,
+      "sampling_rate_pct": 0.4019
+    },
+    {
+      "date": "2025-12-07",
+      "name": "Raiders vs. Broncos",
+      "official_attendance": 57018,
+      "our_confirmed_devices": 37,
+      "sampling_rate_pct": 0.0649
+    },
+    {
+      "date": "2025-12-28",
+      "name": "Raiders vs. Giants",
+      "official_attendance": 52136,
+      "our_confirmed_devices": 46,
+      "sampling_rate_pct": 0.0882
+    },
+    {
+      "date": "2025-12-31",
+      "name": "Las Vegas Bowl",
+      "official_attendance": 34269,
+      "our_confirmed_devices": 28,
+      "sampling_rate_pct": 0.0817
+    }
+  ],
+  "caveat": "The pooled rate is a single flat multiplier applied across all lots/dates. The min/max range above shows real event-to-event variance -- treat any single extrapolated number as an order-of-magnitude estimate, not a precise count, especially for lots or dates far from the matched-date sample."
+}
