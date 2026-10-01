@@ -1,11 +1,11 @@
 {
   "matched_dates": 38,
-  "pooled_sampling_rate_pct": 0.0882,
-  "mean_of_individual_rates_pct": 0.0936,
-  "std_of_individual_rates_pct": 0.0802,
+  "pooled_sampling_rate_pct": 0.088,
+  "mean_of_individual_rates_pct": 0.0932,
+  "std_of_individual_rates_pct": 0.08,
   "min_rate_pct": 0.016,
   "max_rate_pct": 0.4019,
-  "extrapolation_multiplier": 1134.0,
+  "extrapolation_multiplier": 1136.3,
   "per_date": [
     {
       "date": "2025-01-05",
@@ -25,8 +25,8 @@
       "date": "2025-03-01",
       "name": "National Rugby League",
       "official_attendance": 38107,
-      "our_confirmed_devices": 12,
-      "sampling_rate_pct": 0.0315
+      "our_confirmed_devices": 11,
+      "sampling_rate_pct": 0.0289
     },
     {
       "date": "2025-03-29",
@@ -123,8 +123,8 @@
       "date": "2025-08-02",
       "name": "Raiders Stadium Practice",
       "official_attendance": 17295,
-      "our_confirmed_devices": 45,
-      "sampling_rate_pct": 0.2602
+      "our_confirmed_devices": 44,
+      "sampling_rate_pct": 0.2544
     },
     {
       "date": "2025-08-16",
@@ -242,8 +242,8 @@
       "date": "2025-11-21",
       "name": "UNLV vs. Hawaii",
       "official_attendance": 22755,
-      "our_confirmed_devices": 12,
-      "sampling_rate_pct": 0.0527
+      "our_confirmed_devices": 11,
+      "sampling_rate_pct": 0.0483
     },
     {
       "date": "2025-11-23",

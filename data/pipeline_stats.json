@@ -1,17 +1,19 @@
 {
   "raw_pings": 2997668,
   "raw_devices": 124275,
-  "devices_with_lot_ping": 122795,
-  "devices_confirmed_stadium": 5293,
-  "devices_dropped_no_stadium": 117502,
+  "devices_with_lot_ping": 122246,
+  "devices_confirmed_stadium": 5182,
+  "devices_dropped_no_stadium": 117064,
   "devices_dropped_employee": 0,
-  "devices_dropped_repeat_visit_staff": 212,
+  "devices_dropped_repeat_visit_staff": 764,
   "devices_dropped_high_emittance": 821,
-  "devices_with_home": 470666,
-  "final_trips": 4738,
+  "devices_with_home": 470742,
+  "final_trips": 4668,
   "notes": [
     "Dropped 821 device(s) exceeding 400 pings (high-emittance filter).",
     "Repeat-visit staff detection: 212 devices appeared inside the stadium footprint on 5+ distinct dates -- flagged as likely staff and excluded. That's 0.04x the known 5785-person stadium workforce (plausible).",
-    "5293 of 122795 lot-visiting devices confirmed a stadium arrival within 150 minutes; 117502 dropped as noise (real timestamps; stadium confirmation via Pin report)."
+    "Resident/Worker report: 3807 device(s) flagged Worker=='true' (a real vendor signal); 3777 of those weren't already caught by the repeat-visit heuristic -- both are applied together.",
+    "5182 of 122246 lot-visiting devices confirmed a stadium arrival within 150 minutes; 117064 dropped as noise (real timestamps; stadium confirmation via Pin report).",
+    "Resident/Worker report: overrode residency for 388 device(s) to 'local' and 688 device(s) to 'visitor' using Azira's own Resident flag (authoritative, where this report covers them)."
   ]
 }
