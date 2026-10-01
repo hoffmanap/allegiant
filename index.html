@@ -159,6 +159,10 @@ h1.title em{font-style:normal;color:var(--allegiant-red);}
   background:var(--night-navy);
 }
 #map{position:absolute;inset:0;}
+/* Recreates a dark basemap look from plain (bright, no-key-needed)
+   OpenStreetMap tiles -- scoped to just the tile pane so route polylines,
+   markers, and popups (a separate Leaflet pane) are completely unaffected. */
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.9);}
 .legend{
   position:absolute;
   bottom:.8rem;
@@ -430,14 +434,19 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
       <button class="map-icon-btn" id="share-mode-toggle" style="position:absolute;top:5.4rem;right:.8rem;z-index:500;">% Show as share of trips</button>
       <button class="map-icon-btn" id="fullscreen-toggle" style="position:absolute;top:.8rem;left:.8rem;z-index:500;">⛶ Fullscreen</button>
       <button class="map-icon-btn" id="flow-pause-toggle" style="position:absolute;top:3.1rem;left:.8rem;z-index:500;">⏸ Pause flow animation</button>
+      <div class="map-mode-toggle" id="direction-filter-toggle" style="position:absolute;top:5.4rem;left:.8rem;right:auto;">
+        <button data-direction="all" class="active">Both</button>
+        <button data-direction="to_stadium">→ To Stadium</button>
+        <button data-direction="from_stadium">← Leaving</button>
+      </div>
       <div class="color-legend" id="color-legend">
         <div id="legend-label">Devices per segment</div>
         <div class="ramp" id="legend-ramp"></div>
         <div style="display:flex;justify-content:space-between;"><span id="legend-min">low</span><span id="legend-max">high</span></div>
       </div>
       <div class="legend">
-        <span><i class="swatch" style="background:var(--torch-amber)"></i>Flow to stadium</span>
-        <span><i class="swatch" style="background:var(--allegiant-red)"></i>Flow from stadium</span>
+        <span id="legend-to-stadium"><i class="swatch" style="background:var(--torch-amber)"></i>Flow to stadium</span>
+        <span id="legend-from-stadium"><i class="swatch" style="background:var(--allegiant-red)"></i>Flow from stadium</span>
       </div>
     </div>
 
@@ -596,8 +605,14 @@ const stadium = PRIMARY_DATA.lot_centroids.stadium;
 const map = L.map('map', {zoomControl:true, scrollWheelZoom:true})
   .setView([stadium.lat, stadium.lon], 15);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19
+// Plain OpenStreetMap tiles -- no API key required, ever (unlike the
+// previous CartoDB dark basemap, which started requiring one). The dark
+// look is recreated with a CSS filter on just the tile pane (see
+// .leaflet-tile-pane in <style>), which leaves the route overlays --
+// polylines, markers, the whole leaflet-overlay-pane -- completely
+// unaffected since that's a separate Leaflet pane.
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; OpenStreetMap contributors', maxZoom:19
 }).addTo(map);
 
 L.circleMarker([stadium.lat, stadium.lon], {
@@ -774,6 +789,7 @@ function computeSegmentAggregates(lots, residencyFilter){
   PRIMARY_DATA.routes.forEach(r=>{
     if(!lots.includes(r.lot)) return;
     if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    if(directionFilter !== 'all' && r.direction !== directionFilter) return;
     if(!passesDateFilter(r)) return;
     totalFilteredLegs++;
     if(r.direction === 'to_stadium') totalFilteredToStadium++; else totalFilteredFromStadium++;
@@ -883,6 +899,8 @@ let rankingMode = 'entry'; // 'entry' | 'exit' | 'top20' -- drives the ranked ch
 let top20Highlight = false; // white-halo outline on the map for the 20 busiest corridors
 let shareMode = false; // show % of filtered trips instead of raw device counts -- more
                         // honest when the underlying sample per route is small
+let directionFilter = 'all'; // 'all' | 'to_stadium' | 'from_stadium' -- which direction of
+                              // travel the map, animation, and ranked charts reflect
 let lastEntryPoints = [];
 let lastExitPoints = [];
 let lastCorridorStats = new Map();
@@ -977,7 +995,8 @@ function renderStreetSegments(lots, residencyFilter){
 function renderStraightLineFallback(lots){
   // Used only when the export has no --street-match data. Draws the old
   // aggregated GPS-interpolated flow lines instead of real street segments.
-  ['to_stadium','from_stadium'].forEach(direction=>{
+  const directions = directionFilter === 'all' ? ['to_stadium','from_stadium'] : [directionFilter];
+  directions.forEach(direction=>{
     lots.forEach(lot=>{
       const key = lot + '||' + direction;
       (PRIMARY_DATA.flow_lines[key] || []).forEach(line=>{
@@ -1013,6 +1032,9 @@ function updateColorLegend(maxTotal){
 function renderMap(lotsInput, residencyFilter){
   routeLayer.clearLayers();
   const lots = (lotsInput === 'all' || !lotsInput.length) ? allLotNames : lotsInput;
+
+  document.getElementById('legend-to-stadium').style.opacity = directionFilter === 'from_stadium' ? '.35' : '1';
+  document.getElementById('legend-from-stadium').style.opacity = directionFilter === 'to_stadium' ? '.35' : '1';
 
   if(STREET_MATCH_AVAILABLE){
     document.getElementById('street-match-note').classList.remove('visible');
@@ -1563,6 +1585,15 @@ document.getElementById('share-mode-toggle').addEventListener('click', (e)=>{
   e.target.classList.toggle('active', shareMode);
   e.target.textContent = (shareMode ? '#' : '%') + (shareMode ? ' Show as device count' : ' Show as share of trips');
   renderMap([...activeLots], activeResidency);
+});
+
+document.querySelectorAll('#direction-filter-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#direction-filter-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    directionFilter = btn.dataset.direction;
+    renderMap([...activeLots], activeResidency);
+  });
 });
 
 document.getElementById('fullscreen-toggle').addEventListener('click', ()=>{
