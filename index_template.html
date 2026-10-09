@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Walk In — Routes to Allegiant Stadium</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+
+/* ---------------------------------------------------------------- */
+/* TOKENS                                                            */
+/* ---------------------------------------------------------------- */
+:root{
+  --field-black:#0c0d10;
+  --night-navy:#12151c;
+  --panel:#181b23;
+  --line:#2a2e38;
+  --paper:#f1ede4;
+  --silver:#c9cdd6;
+  --allegiant-red:#a6192e;
+  --torch-amber:#ffb648;
+  --local-teal:#3ec9a7;
+  --visitor-violet:#b98cf2;
+  --muted:#7d8394;
+  --display: "Oswald", "Arial Narrow", sans-serif;
+  --body: "Source Serif 4", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--field-black);
+  color:var(--paper);
+  font-family:var(--body);
+  line-height:1.6;
+}
+::selection{background:var(--allegiant-red);color:#fff;}
+a{color:var(--torch-amber);}
+
+/* ---------------------------------------------------------------- */
+/* MASTHEAD                                                          */
+/* ---------------------------------------------------------------- */
+.masthead{
+  padding:6vh 6vw 5vh;
+  max-width:1000px;
+  border-bottom:1px solid var(--line);
+}
+.kicker{
+  font-family:var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:.72rem;
+  color:var(--torch-amber);
+  margin:0 0 1.2rem;
+}
+.kicker::before{content:"● ";color:var(--allegiant-red);}
+h1.title{
+  font-family:var(--display);
+  font-weight:600;
+  text-transform:uppercase;
+  font-size:clamp(2.2rem,6vw,4.4rem);
+  line-height:.96;
+  margin:0 0 1.2rem;
+}
+h1.title em{font-style:normal;color:var(--allegiant-red);}
+.dek{font-size:1.12rem;max-width:640px;color:var(--silver);margin:0;}
+.dek b{color:var(--paper);font-weight:600;}
+.byline{
+  font-family:var(--mono);
+  font-size:.76rem;
+  color:var(--muted);
+  margin-top:1.6rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+/* ---------------------------------------------------------------- */
+/* MAIN EXPERIENCE: narrative rail (scrolls) + persistent map+panel  */
+/* (sticky) -- map, filters, and charts share one frame the whole    */
+/* time, so nothing resets when you scroll.                          */
+/* ---------------------------------------------------------------- */
+.experience{
+  display:grid;
+  grid-template-columns:minmax(320px,40%) 1fr;
+  align-items:start;
+}
+.narrative-rail{
+  padding:5vh 4vw 10vh;
+  border-right:1px solid var(--line);
+}
+.step{
+  max-width:520px;
+  padding:2.2rem 0;
+  border-bottom:1px dashed var(--line);
+  opacity:.45;
+  transition:opacity .35s ease;
+}
+.step:last-child{border-bottom:none;}
+.step.is-active{opacity:1;}
+.step .eyebrow{
+  font-family:var(--mono);
+  font-size:.7rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin:0 0 .6rem;
+}
+.step h2{
+  font-family:var(--display);
+  text-transform:uppercase;
+  font-weight:600;
+  font-size:1.4rem;
+  margin:0 0 .9rem;
+}
+.step p{margin:0 0 .9rem;color:var(--silver);font-size:1rem;}
+.hl{
+  padding:.05em .35em;
+  border-radius:3px;
+  font-weight:600;
+  color:var(--field-black);
+  cursor:pointer;
+}
+.step.is-active .hl{box-shadow:0 0 0 2px var(--field-black), 0 0 0 3px currentColor;}
+
+.override-note{
+  font-family:var(--mono);
+  font-size:.72rem;
+  color:var(--torch-amber);
+  background:rgba(255,182,72,.08);
+  border:1px solid rgba(255,182,72,.3);
+  border-radius:6px;
+  padding:.6rem .8rem;
+  margin:1.4rem 0 0;
+  display:none;
+}
+.override-note.visible{display:block;}
+
+/* Sticky right column: everything lives here, always in frame */
+.side-panel{
+  position:sticky;
+  top:0;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:var(--night-navy);
+  border-left:1px solid var(--line);
+}
+.map-zone{
+  position:relative;
+  flex:0 0 52%;
+  min-height:280px;
+  border-bottom:1px solid var(--line);
+}
+.map-zone:fullscreen{
+  flex-basis:100vh;
+  width:100vw;
+  height:100vh;
+  background:var(--night-navy);
+}
+#map{position:absolute;inset:0;}
+/* Recreates a dark basemap look from plain (bright, no-key-needed)
+   OpenStreetMap tiles -- scoped to just the tile pane so route polylines,
+   markers, and popups (a separate Leaflet pane) are completely unaffected. */
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.9);}
+.legend{
+  position:absolute;
+  bottom:.8rem;
+  left:.8rem;
+  z-index:500;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:.6rem .8rem;
+  font-family:var(--mono);
+  font-size:.68rem;
+  color:var(--silver);
+  display:flex;
+  gap:.9rem;
+}
+.legend span{display:flex;align-items:center;gap:.35rem;}
+.swatch{width:12px;height:3px;border-radius:2px;display:inline-block;}
+
+/* animated directional flow on street-segment polylines (SVG dash animation) */
+.flow-to-stadium{stroke-dasharray:7,5;animation:flow-fwd 4s linear infinite;}
+.flow-from-stadium{stroke-dasharray:7,5;animation:flow-rev 4s linear infinite;}
+@keyframes flow-fwd{to{stroke-dashoffset:-24;}}
+@keyframes flow-rev{to{stroke-dashoffset:24;}}
+.flow-paused .flow-to-stadium, .flow-paused .flow-from-stadium{animation:none;stroke-dasharray:none;}
+
+.map-mode-toggle{
+  position:absolute;
+  top:.8rem;
+  right:.8rem;
+  z-index:500;
+  display:flex;
+  gap:.3rem;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:.3rem;
+}
+.map-mode-toggle button{
+  font-family:var(--mono);font-size:.66rem;
+  background:none;border:none;color:var(--silver);
+  padding:.35rem .6rem;border-radius:5px;cursor:pointer;
+}
+.map-mode-toggle button.active{background:var(--allegiant-red);color:#fff;}
+
+.map-icon-btn{
+  font-family:var(--mono);font-size:.68rem;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  color:var(--silver);
+  padding:.4rem .7rem;
+  border-radius:6px;
+  cursor:pointer;
+}
+.map-icon-btn.active{border-color:var(--torch-amber);color:var(--torch-amber);}
+.color-legend{
+  position:absolute;
+  bottom:.8rem;
+  right:.8rem;
+  z-index:500;
+  background:rgba(12,13,16,.88);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:.5rem .7rem;
+  font-family:var(--mono);
+  font-size:.62rem;
+  color:var(--muted);
+}
+.color-legend .ramp{
+  height:8px;width:120px;border-radius:3px;margin:.3rem 0;
+  background:linear-gradient(to right, #3a3f4c, #ffb648, #a6192e);
+}
+.color-legend .ramp.diverge{
+  background:linear-gradient(to right, var(--visitor-violet), #4a4f5c, var(--local-teal));
+}
+.legend-categorical{display:none;}
+.legend-categorical.visible{display:block;}
+.legend-categorical .row{display:flex;align-items:center;gap:.4rem;margin:.22rem 0;}
+.legend-categorical .sw{width:16px;height:3px;border-radius:2px;flex-shrink:0;}
+.legend-categorical .sw.dashed{
+  background-image:repeating-linear-gradient(to right, currentColor 0 4px, transparent 4px 7px);
+  background-color:transparent !important;
+}
+.legend-categorical .note{margin-top:.35rem;opacity:.75;font-size:.58rem;line-height:1.35;max-width:150px;}
+.street-match-note{
+  position:absolute;
+  top:.8rem;
+  left:.8rem;
+  z-index:500;
+  background:rgba(166,25,46,.92);
+  border-radius:8px;
+  padding:.6rem .8rem;
+  font-family:var(--mono);
+  font-size:.68rem;
+  color:#fff;
+  max-width:260px;
+  display:none;
+}
+.street-match-note.visible{display:block;}
+
+/* scrollable lower half of the sticky panel: controls + charts */
+.panel-scroll{
+  flex:1 1 auto;
+  overflow-y:auto;
+  padding:1.2rem 1.2rem 2.5rem;
+}
+.panel-scroll h4{
+  font-family:var(--mono);
+  text-transform:uppercase;
+  letter-spacing:.09em;
+  font-size:.7rem;
+  color:var(--torch-amber);
+  margin:1.4rem 0 .7rem;
+}
+.panel-scroll h4:first-child{margin-top:0;}
+
+.lot-toggles{display:flex;flex-wrap:wrap;gap:.4rem;}
+.lot-chip{
+  font-family:var(--mono);
+  font-size:.72rem;
+  padding:.35rem .65rem;
+  border-radius:99px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  color:var(--silver);
+  cursor:pointer;
+  user-select:none;
+}
+.lot-chip.active{color:var(--field-black);border-color:transparent;font-weight:700;}
+.lot-chip-row{display:flex;gap:.4rem;margin-bottom:.6rem;}
+.lot-chip-row button{
+  font-family:var(--mono);font-size:.68rem;
+  background:none;border:1px solid var(--line);color:var(--muted);
+  border-radius:5px;padding:.25rem .5rem;cursor:pointer;
+}
+.lot-chip-row button.active{border-color:var(--allegiant-red);color:var(--allegiant-red);background:rgba(166,25,46,.1);}
+
+.residency-toggle{display:flex;gap:.5rem;}
+.res-btn{
+  font-family:var(--mono);font-size:.72rem;
+  padding:.4rem .8rem;border-radius:6px;
+  border:1px solid var(--line);background:var(--panel);color:var(--silver);
+  cursor:pointer;flex:1;
+}
+.res-btn.active{background:var(--allegiant-red);border-color:var(--allegiant-red);color:#fff;}
+
+.hud-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.74rem;color:var(--silver);padding:.25rem 0;}
+.hud-row b{color:var(--paper);}
+
+.chart-wrap{margin-top:.4rem;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.8rem;}
+.chart-wrap canvas{max-height:180px;}
+.chart-note{font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.4rem;}
+
+.bin-toggle{display:flex;gap:.4rem;margin-bottom:.5rem;}
+.bin-toggle button{
+  font-family:var(--mono);font-size:.66rem;
+  background:var(--panel);border:1px solid var(--line);color:var(--silver);
+  border-radius:5px;padding:.25rem .55rem;cursor:pointer;
+}
+.bin-toggle button.active{border-color:var(--torch-amber);color:var(--torch-amber);}
+
+.event-compare{
+  border-top:1px solid var(--line);
+  margin-top:1.4rem;
+  padding-top:1rem;
+}
+.event-compare input[type=file]{
+  font-family:var(--mono);font-size:.66rem;color:var(--muted);
+  width:100%;
+}
+.event-chip-list{display:flex;flex-direction:column;gap:.3rem;margin-top:.6rem;}
+.event-chip{
+  font-family:var(--mono);font-size:.68rem;color:var(--silver);
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:.4rem .6rem;display:flex;justify-content:space-between;align-items:center;
+}
+.event-chip .swatch-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:.4rem;}
+
+/* ---------------------------------------------------------------- */
+/* FOOTNOTE                                                           */
+/* ---------------------------------------------------------------- */
+footer{
+  max-width:900px;
+  margin:0 auto;
+  padding:5vh 6vw 10vh;
+  color:var(--muted);
+  font-size:.85rem;
+  border-top:1px solid var(--line);
+}
+footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-family:var(--mono);color:var(--silver);}
+
+@media (max-width: 900px){
+  .experience{grid-template-columns:1fr;}
+  .side-panel{position:relative;height:auto;border-left:none;}
+  .map-zone{flex-basis:60vh;}
+  .panel-scroll{overflow-y:visible;}
+  .narrative-rail{padding:4vh 6vw 4vh;border-right:none;}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <p class="kicker">Mobility analysis · Las Vegas, NV</p>
+  <h1 class="title">The Walk In<br><em>Routes to Allegiant Stadium</em></h1>
+  <p class="dek">Anonymized device pings trace how fans actually move from
+    event parking to kickoff — and back out again. Filters, map, and charts
+    stay together in one frame the whole way down, so nothing resets while
+    you explore.</p>
+  <p class="byline">Source: Azira Pinnacle pathing &amp; visitation reports · anonymized, device-level GPS</p>
+</header>
+
+<section class="experience">
+  <div class="narrative-rail" id="narrative-rail">
+
+    <div class="step" data-lots="all" data-residency="all">
+      <p class="eyebrow">01 — The full picture</p>
+      <h2>Every qualifying trip, every lot</h2>
+      <p>Each colored line is a real street segment, matched from raw GPS
+        pings onto actual OpenStreetMap street geometry. Anything slower
+        than the study window, or that never reached the stadium, was
+        dropped as noise before this map was drawn.</p>
+      <p>Color and thickness show how many devices used that segment — the
+        brighter red streets carry the most foot traffic. The animated flow
+        direction shows whether a segment is carrying more people in
+        (amber) or out (red) for your current filter.</p>
+    </div>
+
+    <div class="step" data-lots="Lot A" data-residency="all">
+      <p class="eyebrow">02 — Lot by lot</p>
+      <h2>Isolating a single lot</h2>
+      <p>Click any lot in the narrative or the picker to isolate it. Here's
+        <span class="hl" data-lot="Lot A">Lot A</span> on its own.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="local">
+      <p class="eyebrow">03 — Locals vs. visitors</p>
+      <h2>How locals walk in</h2>
+      <p>Devices are classified by their Common Evening Location. Filtering
+        to <span class="hl" data-res="local">locals</span> surfaces whether
+        people who live in the Las Vegas metro favor different routes than
+        out-of-town visitors.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="visitor">
+      <p class="eyebrow">04 — Locals vs. visitors</p>
+      <h2>How visitors walk in</h2>
+      <p>Now the same lots, filtered to <span class="hl" data-res="visitor">visitors</span>
+        only. Check the time-to-stadium chart below the map — visitor trips
+        often run slower on average.</p>
+    </div>
+
+    <div class="step" data-lots="all" data-residency="all">
+      <p class="eyebrow">05 — Explore</p>
+      <h2>Build your own view</h2>
+      <p>Once you touch the picker or toggle below, this guided tour stops
+        driving the map so your selection sticks — scroll freely without
+        losing it.</p>
+      <div class="override-note" id="override-note">Manual mode is on — scrolling
+        through the steps above will highlight this text but won't change
+        your map selection. Reload the page to restart the guided tour.</div>
+    </div>
+
+  </div>
+
+  <div class="side-panel">
+    <div class="map-zone">
+      <div id="map"></div>
+      <div class="street-match-note" id="street-match-note">
+        No street-matched data in this export — showing straight-line
+        GPS-derived paths. Re-run the pipeline with <code>--street-match</code>
+        for real street-segment volumes.
+      </div>
+      <div class="map-mode-toggle" id="map-mode-toggle">
+        <button data-mode="volume" class="active">Volume</button>
+        <button data-mode="residency">Local vs. Visitor</button>
+        <button data-mode="street_type">Street Type</button>
+      </div>
+      <button class="map-icon-btn" id="top20-toggle" style="position:absolute;top:3.1rem;right:.8rem;z-index:500;">☆ Highlight top 20 busiest streets</button>
+      <button class="map-icon-btn" id="share-mode-toggle" style="position:absolute;top:5.4rem;right:.8rem;z-index:500;">% Show as share of trips</button>
+      <button class="map-icon-btn" id="fullscreen-toggle" style="position:absolute;top:.8rem;left:.8rem;z-index:500;">⛶ Fullscreen</button>
+      <button class="map-icon-btn" id="flow-pause-toggle" style="position:absolute;top:3.1rem;left:.8rem;z-index:500;">⏸ Pause flow animation</button>
+      <div class="map-mode-toggle" id="direction-filter-toggle" style="position:absolute;top:5.4rem;left:.8rem;right:auto;">
+        <button data-direction="all" class="active">Both</button>
+        <button data-direction="to_stadium">→ To Stadium</button>
+        <button data-direction="from_stadium">← Leaving</button>
+      </div>
+      <div class="map-mode-toggle" id="mode-filter-toggle" style="position:absolute;top:7.7rem;left:.8rem;right:auto;">
+        <button data-trip-mode="all" class="active">All modes</button>
+        <button data-trip-mode="walking">🚶 Walking</button>
+        <button data-trip-mode="biking">🚲 Biking</button>
+        <button data-trip-mode="car">🚗 Car</button>
+      </div>
+      <div class="color-legend" id="color-legend">
+        <div id="legend-label">Devices per segment</div>
+        <div class="ramp" id="legend-ramp"></div>
+        <div style="display:flex;justify-content:space-between;" id="legend-minmax-row"><span id="legend-min">low</span><span id="legend-max">high</span></div>
+        <div class="legend-categorical" id="legend-categorical"></div>
+      </div>
+      <div class="legend">
+        <span id="legend-to-stadium"><i class="swatch" style="background:var(--torch-amber)"></i>Flow to stadium</span>
+        <span id="legend-from-stadium"><i class="swatch" style="background:var(--allegiant-red)"></i>Flow from stadium</span>
+      </div>
+    </div>
+
+    <div class="panel-scroll">
+      <h4>Date range</h4>
+      <p class="chart-note" id="date-range-note"></p>
+      <div class="lot-chip-row">
+        <input type="date" id="date-start-input" style="font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--silver);border-radius:5px;padding:.3rem;">
+        <input type="date" id="date-end-input" style="font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--silver);border-radius:5px;padding:.3rem;">
+        <button id="date-reset-btn">All dates</button>
+      </div>
+      <div class="lot-chip-row" id="busiest-dates-row" style="flex-wrap:wrap;"></div>
+
+      <p class="chart-note">Filter to all dates of one event type at once (based on a 2025 Allegiant Stadium event calendar cross-checked against this data's own busiest dates):</p>
+      <div class="lot-chip-row" id="event-type-toggle" style="flex-wrap:wrap;">
+        <button data-event-type="all" class="active">All events</button>
+        <button data-event-type="nfl_home_game">Raiders</button>
+        <button data-event-type="college_football">UNLV</button>
+        <button data-event-type="concert">Concerts</button>
+        <button data-event-type="other_event">Other</button>
+        <button data-event-type="unlabeled">Unlabeled</button>
+      </div>
+
+      <h4>Parking lots</h4>
+      <div class="lot-chip-row">
+        <button id="lots-all">All lots</button>
+        <button id="lots-none">Clear</button>
+      </div>
+      <div class="lot-toggles" id="lot-toggles"></div>
+
+      <h4>Residency</h4>
+      <div class="residency-toggle" id="residency-toggle">
+        <button class="res-btn active" data-res="all">All</button>
+        <button class="res-btn" data-res="local">Locals</button>
+        <button class="res-btn" data-res="visitor">Visitors</button>
+      </div>
+
+      <h4>Selection summary</h4>
+      <div class="hud-row"><span>Devices</span><b id="hud-devices">–</b></div>
+      <div class="hud-row"><span>Median time in</span><b id="hud-time-in">–</b></div>
+      <div class="hud-row"><span>Median time out</span><b id="hud-time-out">–</b></div>
+      <div class="hud-row"><span>Local / Visitor</span><b id="hud-res">–</b></div>
+
+      <h4>Estimated people per lot (live-filtered)</h4>
+      <p class="chart-note">Scaled from our device sample using a single flat rate, and updates with your lot/date/residency filters above. For a more precise (but non-filterable) per-event calculation, see "Estimated actual attendance by lot" below.</p>
+      <div class="chart-wrap"><canvas id="chart-devices"></canvas></div>
+
+      <h4>Estimated actual attendance by lot</h4>
+      <p class="chart-note" id="extrapolation-note"></p>
+      <div class="chart-wrap"><canvas id="chart-extrapolation"></canvas></div>
+
+      <h4>Local vs. visitor by lot</h4>
+      <div class="chart-wrap"><canvas id="chart-residency"></canvas></div>
+
+      <h4>Time to stadium</h4>
+      <div class="bin-toggle" id="bin-toggle">
+        <button data-bin="5" class="active">5 min bins</button>
+        <button data-bin="10">10 min bins</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-histogram"></canvas>
+        <p class="chart-note" id="histogram-note"></p>
+      </div>
+
+      <h4>Trips by time of day</h4>
+      <p class="chart-note" id="tod-note"></p>
+      <div class="chart-wrap"><canvas id="chart-time-of-day"></canvas></div>
+
+      <h4>Busiest points</h4>
+      <div class="lot-chip-row" id="ranking-mode-toggle">
+        <button data-ranking="entry" class="active">Entry</button>
+        <button data-ranking="exit">Exit</button>
+        <button data-ranking="top20">Top 20</button>
+      </div>
+      <p class="chart-note" id="entry-points-note"></p>
+      <div class="chart-wrap"><canvas id="chart-entry-points"></canvas></div>
+
+      <div class="event-compare">
+        <h4 style="margin-top:0;">Compare against another event</h4>
+        <p class="chart-note">Load another game's <code>dashboard_data.json</code>
+          (built by the same pipeline) to overlay its time-to-stadium
+          distribution on the chart above.</p>
+        <input type="file" id="event-file-input" accept="application/json" multiple>
+        <div class="event-chip-list" id="event-chip-list"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><b>Methodology.</b> Trips are reconstructed from an Azira Pinnacle
+    Pathing X export, with stadium arrival independently confirmed by a Pin
+    report and spatially matched against the exact stadium footprint. A
+    device only appears here if it pinged inside a mapped lot polygon and
+    reached the stadium within the study's post-window; devices that never
+    showed a confirmed arrival in that window were excluded as noise.
+    Residency is derived from each device's Common Evening Location relative
+    to the Las Vegas metro area. Lots with fewer than <code>38</code>
+    qualifying devices are flagged low-confidence.</p>
+  <p><b>Street segments</b> are matched offline, in the Python pipeline,
+    against real OpenStreetMap street-centerline geometry (via
+    <code>--street-match</code>) — not guessed live in the browser. Segment
+    color and thickness show device volume; the animated flow direction
+    shows whether a segment carries more inbound or outbound traffic for the
+    current filter. "Devices per segment" and "entry points" both recompute
+    live as you change the lot/residency filters, since the underlying data
+    shipped to the browser is each trip's matched street sequence, not a
+    single pre-baked total.</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================== */
+/* DATA                                                              */
+/* ============================================================== */
+const PRIMARY_DATA = __DASHBOARD_DATA__;
+const EVENT_META = __EVENT_META__; // {name, date, type} or null
+const EDGE_GEOMETRIES = __EDGE_GEOMETRIES__; // {canonical_edge_key: [[lat,lon],...]} or {}
+const EDGE_CORRIDORS_RAW = __EDGE_CORRIDORS__; // {canonical_edge_key: corridor_name_or_key} or {}
+const EXTRAPOLATION_CALIBRATION = __EXTRAPOLATION_CALIBRATION__; // {} if not available for this run
+const STREET_CLASSIFICATION = __STREET_CLASSIFICATION__; // {corridor: {type, dominant_mode, mode_counts,
+  // majority_highway, type_confidence, n_votes}} or {} if this run didn't use --street-match, or predates
+  // street-type classification -- the "Street Type" map mode and mode filter below both degrade gracefully
+  // (falls back to showing every corridor as "unclassified") when this is empty.
+// Merge divided/parallel carriageways of the same named street into one
+// corridor for counting, so volume isn't diluted across each individual
+// OSM lane-edge -- falls back to "each edge is its own corridor" if this
+// export predates --street-match's corridor grouping.
+const EDGE_CORRIDORS = {};
+Object.keys(EDGE_GEOMETRIES).forEach(key=>{
+  EDGE_CORRIDORS[key] = EDGE_CORRIDORS_RAW[key] || key;
+});
+const CORRIDOR_TO_EDGES = {};
+Object.entries(EDGE_CORRIDORS).forEach(([edgeKey, corridor])=>{
+  (CORRIDOR_TO_EDGES[corridor] = CORRIDOR_TO_EDGES[corridor] || []).push(edgeKey);
+});
+const STREET_MATCH_AVAILABLE = PRIMARY_DATA.routes.length > 0 && PRIMARY_DATA.routes[0].hasOwnProperty('matched_edges') && Object.keys(EDGE_GEOMETRIES).length > 0;
+
+const events = [{
+  id: "primary",
+  meta: EVENT_META || {name: "This event", date: "", type: "unknown"},
+  data: PRIMARY_DATA,
+  color: "#ffb648",
+}];
+
+const LOT_COLORS = {};
+const PALETTE = ["#ffb648","#3ec9a7","#b98cf2","#e0664a","#6fb1ff","#f2d24f","#ff8fb3","#8fe3c7"];
+Object.keys(PRIMARY_DATA.lot_centroids.lots).forEach((lot,i)=>{
+  LOT_COLORS[lot] = PALETTE[i % PALETTE.length];
+});
+
+const deviceResidency = {};
+PRIMARY_DATA.routes.forEach(r=>{ deviceResidency[r.device_id] = r.residency; });
+
+/* ============================================================== */
+/* MAP SETUP                                                         */
+/* ============================================================== */
+const stadium = PRIMARY_DATA.lot_centroids.stadium;
+const map = L.map('map', {zoomControl:true, scrollWheelZoom:true})
+  .setView([stadium.lat, stadium.lon], 15);
+
+// Plain OpenStreetMap tiles -- no API key required, ever (unlike the
+// previous CartoDB dark basemap, which started requiring one). The dark
+// look is recreated with a CSS filter on just the tile pane (see
+// .leaflet-tile-pane in <style>), which leaves the route overlays --
+// polylines, markers, the whole leaflet-overlay-pane -- completely
+// unaffected since that's a separate Leaflet pane.
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+
+L.circleMarker([stadium.lat, stadium.lon], {
+  radius:8, color:'#fff', weight:2, fillColor:'#a6192e', fillOpacity:1
+}).addTo(map).bindTooltip("Allegiant Stadium");
+
+const lotMarkers = {};
+Object.entries(PRIMARY_DATA.lot_centroids.lots).forEach(([lot, c])=>{
+  const m = L.circleMarker([c.lat, c.lon], {
+    radius:8, color:'#0c0d10', weight:2, fillColor: LOT_COLORS[lot], fillOpacity:1, className:'lot-marker'
+  }).addTo(map).bindTooltip(`<b>${lot}</b><br>Click to see routes to/from this lot`);
+  m.on('click', ()=>{
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    activeLots = new Set([lot]);
+    document.querySelectorAll('.lot-chip').forEach(chip=>paintChip(chip, chip.dataset.lot === lot));
+    renderMap([lot], activeResidency);
+  });
+  lotMarkers[lot] = m;
+});
+
+let routeLayer = L.layerGroup().addTo(map);
+
+/* ============================================================== */
+/* STATE                                                             */
+/* ============================================================== */
+const allLotNames = Object.keys(PRIMARY_DATA.lot_centroids.lots);
+let activeLots = new Set(allLotNames);
+let activeResidency = 'all';
+let manualOverride = false;
+let histogramBin = 5;
+
+// Date filter -- this dataset may span many months/events (verify with the
+// person before assuming it's a single game), so every chart filters by a
+// [dateStart, dateEnd] range in addition to lot/residency. null on either
+// end means unbounded in that direction.
+// Real 2025 Allegiant Stadium event calendar. The underlined dates below
+// were read directly off allegiantstadium.com's own month-by-month
+// event/calendar widget (every month, Jan-Dec 2025) via screenshots, then
+// each individually identified -- confirmed February has no events, and
+// every other underlined date across the full year was found (including
+// Jan 18, via a direct screenshot of that event's own page: Inter Miami CF
+// vs. Club América). Combined with raiders.com and unlvrebels.com's
+// historical results pages (real 2025 game-by-game records). Every date
+// below was cross-checked against real trip counts in this export before
+// being added -- none were guessed.
+const EVENT_CALENDAR = {
+  // Raiders home games (Allegiant Stadium)
+  '2025-08-16': {name: 'Raiders vs. 49ers (preseason)', type: 'nfl_home_game'},
+  '2025-09-15': {name: 'Raiders vs. Chargers', type: 'nfl_home_game'},
+  '2025-09-28': {name: 'Raiders vs. Bears', type: 'nfl_home_game'},
+  '2025-10-12': {name: 'Raiders vs. Titans', type: 'nfl_home_game'},
+  '2025-11-02': {name: 'Raiders vs. Jaguars', type: 'nfl_home_game'},
+  '2025-11-17': {name: 'Raiders vs. Cowboys', type: 'nfl_home_game'},
+  '2025-11-23': {name: 'Raiders vs. Browns', type: 'nfl_home_game'},
+  '2025-12-07': {name: 'Raiders vs. Broncos', type: 'nfl_home_game'},
+  '2025-12-28': {name: 'Raiders vs. Giants', type: 'nfl_home_game'},
+  // UNLV Rebels home games (Allegiant Stadium)
+  '2025-08-23': {name: 'UNLV vs. Idaho State', type: 'college_football'},
+  '2025-09-06': {name: 'UNLV vs. UCLA', type: 'college_football'},
+  '2025-10-11': {name: 'UNLV vs. Air Force (Homecoming)', type: 'college_football'},
+  '2025-11-01': {name: 'UNLV vs. New Mexico', type: 'college_football'},
+  '2025-11-15': {name: 'UNLV vs. Utah State', type: 'college_football'},
+  '2025-11-21': {name: 'UNLV vs. Hawai\'i', type: 'college_football'},
+  // Concerts
+  '2025-03-29': {name: 'Mayday 5525', type: 'concert'},
+  '2025-04-26': {name: 'AC/DC — Power Up Tour', type: 'concert'},
+  '2025-05-03': {name: 'Post Malone — Big Ass Stadium Tour', type: 'concert'},
+  '2025-05-31': {name: 'Kendrick Lamar & SZA — Grand National Tour', type: 'concert'},
+  '2025-06-06': {name: 'Coldplay — Music of the Spheres', type: 'concert'},
+  '2025-06-07': {name: 'Coldplay — Music of the Spheres', type: 'concert'},
+  '2025-06-28': {name: 'Shakira — Las Mujeres Ya No Lloran', type: 'concert'},
+  // Other major stadium events
+  '2025-03-01': {name: 'Rugby League Las Vegas', type: 'other_event'},
+  '2025-01-05': {name: 'Raiders vs. Chargers (season finale)', type: 'nfl_home_game'},
+  '2025-01-18': {name: 'Inter Miami CF vs. Club América (Celebration Match)', type: 'other_event'},
+  '2025-04-19': {name: 'WrestleMania 41 — Night 1', type: 'other_event'},
+  '2025-04-20': {name: 'WrestleMania 41 — Night 2', type: 'other_event'},
+  '2025-12-31': {name: 'Las Vegas Bowl (Utah vs. Nebraska)', type: 'other_event'},
+  '2025-06-22': {name: 'Concacaf Gold Cup Doubleheader', type: 'other_event'},
+  '2025-09-13': {name: 'Canelo Álvarez vs. Terence Crawford (Boxing)', type: 'other_event'},
+  '2025-10-04': {name: 'Paul McCartney — Got Back Tour', type: 'concert'},
+  '2025-10-25': {name: 'P&G Las Vegas HBCU Classic (Grambling St. vs. Jackson St.)', type: 'college_football'},
+  '2025-07-05': {name: 'The Weeknd — After Hours Til Dawn', type: 'concert'},
+  '2025-07-25': {name: 'Beyoncé — Cowboy Carter Tour (Night 1)', type: 'concert'},
+  '2025-07-26': {name: 'Beyoncé — Cowboy Carter Tour (Night 2)', type: 'concert'},
+  '2025-09-19': {name: 'Chris Brown — Breezy Bowl XX Tour (Night 1)', type: 'concert'},
+  '2025-09-20': {name: 'Chris Brown — Breezy Bowl XX Tour (Night 2)', type: 'concert'},
+};
+const EVENT_TYPE_LABELS = {
+  nfl_home_game: 'Raiders home games', college_football: 'UNLV home games',
+  concert: 'Concerts', other_event: 'Other major events', unlabeled: 'Unlabeled dates',
+};
+const EVENT_TYPE_COLORS = {
+  nfl_home_game: '#a6192e', college_football: '#ffb648', concert: '#3ec9a7',
+  other_event: '#b98cf2', unlabeled: '#7d8394',
+};
+let activeEventType = 'all'; // 'all' | a key in EVENT_TYPE_LABELS
+
+const ALL_TRIP_DATES = [...new Set(PRIMARY_DATA.routes.map(r=>r.departure_date).filter(Boolean))].sort();
+const DATE_COUNTS = new Map();
+PRIMARY_DATA.routes.forEach(r=>{
+  if(!r.departure_date) return;
+  DATE_COUNTS.set(r.departure_date, (DATE_COUNTS.get(r.departure_date)||0) + 1);
+});
+const MIN_TRIP_DATE = ALL_TRIP_DATES[0] || null;
+const MAX_TRIP_DATE = ALL_TRIP_DATES[ALL_TRIP_DATES.length-1] || null;
+let activeDateStart = null; // null = unbounded (full range)
+let activeDateEnd = null;
+
+function passesDateFilter(r){
+  if(activeEventType !== 'all'){
+    if(!r.departure_date) return false;
+    const ev = EVENT_CALENDAR[r.departure_date];
+    const evType = ev ? ev.type : 'unlabeled';
+    if(evType !== activeEventType) return false;
+  }
+  if(!activeDateStart && !activeDateEnd) return true; // no range filter active
+  if(!r.departure_date) return false; // range filter is active but this trip has no date to check against
+  if(activeDateStart && r.departure_date < activeDateStart) return false;
+  if(activeDateEnd && r.departure_date > activeDateEnd) return false;
+  return true;
+}
+
+function computeLiveLotSummary(){
+  // Recomputed from routes (not the static lot_summary.json) so it respects
+  // the date filter -- lot_summary.json is a single whole-dataset snapshot
+  // and has no date dimension to filter by.
+  const perLot = new Map(); // lot -> Map(device_id -> residency)
+  PRIMARY_DATA.routes.forEach(r=>{
+    if(!passesDateFilter(r)) return;
+    if(!perLot.has(r.lot)) perLot.set(r.lot, new Map());
+    perLot.get(r.lot).set(r.device_id, r.residency);
+  });
+  const rows = [];
+  perLot.forEach((deviceMap, lot)=>{
+    let local=0, visitor=0, unknown=0;
+    deviceMap.forEach(res=>{
+      if(res==='local') local++; else if(res==='visitor') visitor++; else unknown++;
+    });
+    const total = deviceMap.size;
+    rows.push({
+      lot, device_count: total,
+      local_pct: total ? Math.round(1000*local/total)/10 : 0,
+      visitor_pct: total ? Math.round(1000*visitor/total)/10 : 0,
+      unknown_pct: total ? Math.round(1000*unknown/total)/10 : 0,
+    });
+  });
+  return rows;
+}
+
+
+/* ============================================================== */
+/* STREET-SEGMENT AGGREGATION (live, filtered by current selection)  */
+/* Mirrors match_routes_to_street_segments() in pathing_pipeline.py, */
+/* but recomputed client-side per filter change so lot/residency     */
+/* selection actually affects the segment volumes shown.             */
+/* ============================================================== */
+function computeSegmentAggregates(lots, residencyFilter){
+  // Two levels: `edgeDir` tracks direction counts per REAL edge (so the
+  // animated flow direction stays accurate to the specific lane a device
+  // actually walked), while `corridorStats` aggregates volume/time per
+  // named-street CORRIDOR (so a divided road's carriageways, or any road
+  // OSM split into multiple nearby edges, don't dilute the count each
+  // shows individually -- every edge belonging to that corridor is colored
+  // by the corridor's combined total).
+  const edgeDir = new Map();      // edgeKey -> {to_count, from_count}
+  const touchedEdges = new Set();
+  const corridorStats = new Map(); // corridor -> {total, local, visitor, unknown, sumMinutes}
+  const entryCounter = new Map();  // corridor -> {total, local, visitor, unknown}
+  const exitCounter = new Map();
+  let totalFilteredLegs = 0, totalFilteredToStadium = 0, totalFilteredFromStadium = 0;
+
+  PRIMARY_DATA.routes.forEach(r=>{
+    if(!lots.includes(r.lot)) return;
+    if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    if(directionFilter !== 'all' && r.direction !== directionFilter) return;
+    if(modeFilter !== 'all' && r.mode !== modeFilter) return;
+    if(!passesDateFilter(r)) return;
+    totalFilteredLegs++;
+    if(r.direction === 'to_stadium') totalFilteredToStadium++; else totalFilteredFromStadium++;
+    const edges = r.matched_edges || [];
+    const uniqueEdgesInOrder = [];
+    edges.forEach(e=>{ if(uniqueEdgesInOrder[uniqueEdgesInOrder.length-1] !== e) uniqueEdgesInOrder.push(e); });
+
+    uniqueEdgesInOrder.forEach(key=>{
+      if(!EDGE_GEOMETRIES[key]) return;
+      touchedEdges.add(key);
+      if(!edgeDir.has(key)) edgeDir.set(key, {to_count:0, from_count:0});
+      edgeDir.get(key)[r.direction === 'to_stadium' ? 'to_count' : 'from_count']++;
+    });
+
+    // Corridor sequence: map each edge to its corridor, then de-duplicate
+    // CONSECUTIVE repeats at the corridor level too (a route can bounce
+    // between two edges of the same named corridor near an intersection
+    // without that meaning "touched this corridor twice").
+    const corridorSeq = [];
+    uniqueEdgesInOrder.forEach(key=>{
+      if(!EDGE_GEOMETRIES[key]) return;
+      const c = EDGE_CORRIDORS[key];
+      if(corridorSeq[corridorSeq.length-1] !== c) corridorSeq.push(c);
+    });
+    const resBucket = r.residency === 'local' ? 'local' : (r.residency === 'visitor' ? 'visitor' : 'unknown');
+
+    new Set(corridorSeq).forEach(c=>{
+      if(!corridorStats.has(c)) corridorStats.set(c, {total:0, to_count:0, from_count:0, local:0, visitor:0, unknown:0, sumMinutes:0});
+      const cs = corridorStats.get(c);
+      cs.total++;
+      cs[r.direction === 'to_stadium' ? 'to_count' : 'from_count']++;
+      cs[resBucket]++;
+      cs.sumMinutes += (r.minutes_to_stadium || 0);
+    });
+
+    if(r.direction === 'to_stadium' && corridorSeq.length){
+      const c = corridorSeq[0]; // entry: first corridor an inbound trip touches
+      if(!entryCounter.has(c)) entryCounter.set(c, {total:0, local:0, visitor:0, unknown:0});
+      const ent = entryCounter.get(c);
+      ent.total++; ent[resBucket]++;
+    }
+    if(r.direction === 'from_stadium' && corridorSeq.length){
+      const c = corridorSeq[corridorSeq.length - 1]; // exit: last corridor an outbound (return) trip touches
+      if(!exitCounter.has(c)) exitCounter.set(c, {total:0, local:0, visitor:0, unknown:0});
+      const ext = exitCounter.get(c);
+      ext.total++; ext[resBucket]++;
+    }
+  });
+
+  corridorStats.forEach(cs=>{ cs.avgMinutes = cs.total ? cs.sumMinutes / cs.total : 0; });
+
+  function corridorBounds(corridor){
+    const edgeKeys = CORRIDOR_TO_EDGES[corridor] || [];
+    const allPts = edgeKeys.flatMap(k=>EDGE_GEOMETRIES[k] || []);
+    return allPts.length ? L.polyline(allPts).getBounds() : null;
+  }
+
+  const entryPoints = [...entryCounter.entries()]
+    .map(([corridor, v])=>({corridor, bounds: corridorBounds(corridor), ...v}))
+    .sort((a,b)=>b.total - a.total).slice(0, 15);
+  const exitPoints = [...exitCounter.entries()]
+    .map(([corridor, v])=>({corridor, bounds: corridorBounds(corridor), ...v}))
+    .sort((a,b)=>b.total - a.total).slice(0, 15);
+
+  return {
+    touchedEdges, edgeDir, corridorStats, entryPoints, exitPoints, corridorBounds,
+    totalFilteredLegs, totalFilteredToStadium, totalFilteredFromStadium,
+  };
+}
+
+function computeTop20Corridors(corridorStats, corridorBoundsFn){
+  const arr = [...corridorStats.entries()].map(([corridor, v])=>({corridor, bounds: corridorBoundsFn(corridor), ...v}));
+  return arr.sort((a,b)=>b.total - a.total).slice(0, 20);
+}
+
+/* ============================================================== */
+/* COLOR RAMPS                                                       */
+/* ============================================================== */
+function lerpColor(c1, c2, t){
+  const p1 = c1.match(/\w\w/g).map(h=>parseInt(h,16));
+  const p2 = c2.match(/\w\w/g).map(h=>parseInt(h,16));
+  const rgb = p1.map((v,i)=>Math.round(v + (p2[i]-v)*t));
+  return `rgb(${rgb.join(',')})`;
+}
+function volumeColor(t){ // t in [0,1]
+  if(t < 0.5) return lerpColor('3a3f4c', 'ffb648', t/0.5);
+  return lerpColor('ffb648', 'a6192e', (t-0.5)/0.5);
+}
+function residencyDiffColor(t){ // t in [-1,1], -1=all visitor, +1=all local
+  const norm = (t+1)/2;
+  if(norm < 0.5) return lerpColor('b98cf2', '4a4f5c', norm/0.5);
+  return lerpColor('4a4f5c', '3ec9a7', (norm-0.5)/0.5);
+}
+
+/* ============================================================== */
+/* MAP + HUD RENDER                                                  */
+/* ============================================================== */
+function median(arr){
+  if(!arr.length) return null;
+  const s = [...arr].sort((a,b)=>a-b);
+  const mid = Math.floor(s.length/2);
+  return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+
+let mapMode = 'volume'; // 'volume' | 'residency'
+let rankingMode = 'entry'; // 'entry' | 'exit' | 'top20' -- drives the ranked chart below the map
+let top20Highlight = false; // white-halo outline on the map for the 20 busiest corridors
+let shareMode = false; // show % of filtered trips instead of raw device counts -- more
+                        // honest when the underlying sample per route is small
+let directionFilter = 'all'; // 'all' | 'to_stadium' | 'from_stadium' -- which direction of
+                              // travel the map, animation, and ranked charts reflect
+let modeFilter = 'all'; // 'all' | 'walking' | 'biking' | 'car' -- restricts every chart/map
+                         // consumer to trips whose trip-level mode (pathing_pipeline.py's
+                         // classify_route_mode) matches; 'stationary' trips are intentionally
+                         // not offered as their own filter button (mostly brief GPS pauses
+                         // mid-walk, not a distinct travel mode someone would filter by)
+
+// Street-type colors: gateway (major road, vehicle-dominant), pedestrian_corridor
+// (walking-dominant), local_street (vehicle-dominant, not a major road). Reuses the
+// existing palette so this mode doesn't introduce a fourth unrelated color language.
+const STREET_TYPE_COLORS = {
+  gateway: '#e0664a',
+  pedestrian_corridor: '#3ec9a7',
+  local_street: '#b98cf2',
+  unclassified: '#6b7280',
+};
+const STREET_TYPE_LABELS = {
+  gateway: 'Gateway (major road, vehicle-dominant)',
+  pedestrian_corridor: 'Pedestrian corridor',
+  local_street: 'Local street (vehicle-dominant)',
+  unclassified: 'Unclassified (no mode data)',
+};
+let lastEntryPoints = [];
+let lastExitPoints = [];
+let lastCorridorStats = new Map();
+let lastCorridorBounds = ()=>null;
+let lastTotalLegs = 0, lastTotalToStadium = 0, lastTotalFromStadium = 0;
+
+// A single flat multiplier, calibrated against real Stadium Authority
+// attendance figures for the whole 2025 calendar (see extrapolation_calibration.json),
+// applied consistently everywhere a count is shown on the map, in the
+// entry/exit rankings, and in the Top 20 list -- so every number on this
+// page represents an estimated ACTUAL count, not a raw sample size. The one
+// exception is the "Estimated actual attendance by lot" chart, which uses a
+// more precise per-event calculation (see its own note) rather than this
+// single flat rate -- the two won't match exactly, and that's expected.
+const POOLED_MULTIPLIER = (EXTRAPOLATION_CALIBRATION && EXTRAPOLATION_CALIBRATION.extrapolation_multiplier) || null;
+
+function scaledCount(n){
+  return POOLED_MULTIPLIER ? Math.round(n * POOLED_MULTIPLIER) : n;
+}
+
+function fmtNumber(n){
+  return n.toLocaleString();
+}
+
+function fmtCount(n, total){
+  if(shareMode){
+    if(!total) return '0%';
+    const pct = 100 * n / total;
+    return (pct < 0.1 && pct > 0 ? '<0.1' : pct.toFixed(1)) + '%';
+  }
+  return fmtNumber(scaledCount(n));
+}
+
+function renderStreetSegments(lots, residencyFilter){
+  const {
+    touchedEdges, edgeDir, corridorStats, entryPoints, exitPoints, corridorBounds,
+    totalFilteredLegs, totalFilteredToStadium, totalFilteredFromStadium,
+  } = computeSegmentAggregates(lots, residencyFilter);
+  lastEntryPoints = entryPoints;
+  lastExitPoints = exitPoints;
+  lastCorridorStats = corridorStats;
+  lastCorridorBounds = corridorBounds;
+  lastTotalLegs = totalFilteredLegs;
+  lastTotalToStadium = totalFilteredToStadium;
+  lastTotalFromStadium = totalFilteredFromStadium;
+
+  const maxTotal = Math.max(1, ...[...corridorStats.values()].map(s=>s.total));
+  const top20 = computeTop20Corridors(corridorStats, corridorBounds);
+  const top20Set = new Set(top20.map(c=>c.corridor));
+
+  touchedEdges.forEach(key=>{
+    const corridor = EDGE_CORRIDORS[key];
+    const cs = corridorStats.get(corridor);
+    if(!cs) return;
+    const path = EDGE_GEOMETRIES[key];
+    const dir = edgeDir.get(key) || {to_count:0, from_count:0};
+    const cls = STREET_CLASSIFICATION[corridor]; // {type, dominant_mode, mode_counts,
+                                                  // majority_highway, type_confidence, n_votes} or undefined
+
+    // Street Type mode only shows real public streets (gateway/pedestrian/
+    // local/unclassified) -- parking-lot aisles, driveways, and footways
+    // are excluded from this analysis entirely (see classify_corridor_privacy
+    // in pathing_pipeline.py), so they're simply not drawn in this view
+    // rather than shown with a misleading color.
+    if(mapMode === 'street_type' && (!cls || cls.type === 'excluded_private')) return;
+
+    let color, lowConfidence = false;
+    if(mapMode === 'street_type'){
+      color = STREET_TYPE_COLORS[cls.type] || STREET_TYPE_COLORS.unclassified;
+      lowConfidence = cls.type_confidence === 'low';
+    } else if(mapMode === 'residency'){
+      const denom = cs.local + cs.visitor;
+      const diff = denom ? (cs.local - cs.visitor) / denom : 0;
+      color = residencyDiffColor(diff);
+    } else {
+      color = volumeColor(cs.total / maxTotal);
+    }
+    let weight = Math.max(1.5, Math.min(8, 1.5 + 6 * (cs.total / maxTotal)));
+    const isTop20 = top20Highlight && top20Set.has(corridor);
+    const dashClass = dir.to_count >= dir.from_count ? 'flow-to-stadium' : 'flow-from-stadium';
+
+    if(isTop20){
+      // A wide, dim white halo drawn first, then the real line on top --
+      // reads as a highlighted outline without needing a second map mode.
+      L.polyline(path, {color:'#ffffff', weight: weight + 5, opacity:.35, lineCap:'round'}).addTo(routeLayer);
+      weight = Math.max(weight, 4);
+    }
+
+    const streetTypeLine = (mapMode === 'street_type')
+      ? `<b style="color:${color}">${STREET_TYPE_LABELS[cls.type] || cls.type}</b>${lowConfidence ? ' <i>(low confidence — small sample or a tied vote)</i>' : ''}<br>`+
+        `Dominant mode: ${cls.dominant_mode || '–'} &nbsp;·&nbsp; Based on ${cls.n_votes} trip${cls.n_votes===1?'':'s'} that touched this street<br>`+
+        (cls.majority_highway ? `OSM road type: ${cls.majority_highway}<br>` : '')
+      : '';
+
+    L.polyline(path, {
+      color, weight, opacity: lowConfidence ? .55 : .9, lineCap:'round',
+      className: dashClass, dashArray: lowConfidence ? '6,6' : null,
+    })
+      .addTo(routeLayer)
+      .bindTooltip(
+        `<b>${corridor === key ? 'Unnamed Path' : corridor}</b>${isTop20 ? ' — Top 20 most-used street' : ''}<br>`+
+        streetTypeLine +
+        `${fmtCount(cs.total, lastTotalLegs)} ${shareMode ? 'of all trips' : 'estimated people'} used this street<br>`+
+        `Heading to stadium: ${fmtCount(cs.to_count, lastTotalToStadium)} &nbsp;·&nbsp; Heading from stadium: ${fmtCount(cs.from_count, lastTotalFromStadium)}<br>`+
+        `Local: ${Math.round(100*cs.local/Math.max(cs.local+cs.visitor+cs.unknown,1))}% &nbsp;·&nbsp; Visitor: ${Math.round(100*cs.visitor/Math.max(cs.local+cs.visitor+cs.unknown,1))}%<br>`+
+        `Average walk time: ${cs.avgMinutes.toFixed(1)} min`
+      );
+  });
+
+  renderRankedPointsChart();
+  updateColorLegend(maxTotal);
+}
+
+function renderStraightLineFallback(lots){
+  // Used only when the export has no --street-match data. Draws the old
+  // aggregated GPS-interpolated flow lines instead of real street segments.
+  const directions = directionFilter === 'all' ? ['to_stadium','from_stadium'] : [directionFilter];
+  directions.forEach(direction=>{
+    lots.forEach(lot=>{
+      const key = lot + '||' + direction;
+      (PRIMARY_DATA.flow_lines[key] || []).forEach(line=>{
+        const color = direction === 'to_stadium' ? '#ffb648' : '#a6192e';
+        const weight = Math.max(1.5, Math.min(7, line.device_count/4));
+        const dashClass = direction === 'to_stadium' ? 'flow-to-stadium' : 'flow-from-stadium';
+        L.polyline(line.path, {color, weight, opacity:.78, lineCap:'round', className: dashClass})
+          .addTo(routeLayer)
+          .bindTooltip(`${lot} · ${direction.replace('_',' ')} · ${line.device_count} devices`);
+      });
+    });
+  });
+}
+
+function updateColorLegend(maxTotal){
+  const ramp = document.getElementById('legend-ramp');
+  const label = document.getElementById('legend-label');
+  const minEl = document.getElementById('legend-min');
+  const maxEl = document.getElementById('legend-max');
+  const minmaxRow = document.getElementById('legend-minmax-row');
+  const categorical = document.getElementById('legend-categorical');
+
+  if(mapMode === 'street_type'){
+    ramp.style.display = 'none';
+    minmaxRow.style.display = 'none';
+    label.textContent = 'Street type (by dominant travel mode)';
+    categorical.classList.add('visible');
+    categorical.innerHTML = ['gateway','pedestrian_corridor','local_street','unclassified'].map(t=>
+      `<div class="row"><i class="sw" style="background:${STREET_TYPE_COLORS[t]}"></i>${STREET_TYPE_LABELS[t]}</div>`
+    ).join('') +
+    `<div class="row"><i class="sw dashed" style="color:${STREET_TYPE_COLORS.gateway}"></i>Low confidence (small sample / tie)</div>` +
+    `<div class="note">Parking-lot aisles, driveways, and footways are excluded — only real public streets are typed. Al Davis Way, for example, shows here; the pathways inside the lots don't.</div>`;
+    return;
+  }
+  ramp.style.display = '';
+  minmaxRow.style.display = '';
+  categorical.classList.remove('visible');
+
+  if(mapMode === 'volume'){
+    ramp.className = 'ramp';
+    label.textContent = shareMode ? 'Share of trips per street' : 'Estimated people per street';
+    minEl.textContent = shareMode ? '0%' : fmtCount(0, lastTotalLegs);
+    maxEl.textContent = fmtCount(maxTotal, lastTotalLegs);
+  } else {
+    ramp.className = 'ramp diverge';
+    label.textContent = 'Visitor-heavy ← → Local-heavy';
+    minEl.textContent = 'visitor';
+    maxEl.textContent = 'local';
+  }
+}
+
+function renderMap(lotsInput, residencyFilter){
+  routeLayer.clearLayers();
+  const lots = (lotsInput === 'all' || !lotsInput.length) ? allLotNames : lotsInput;
+
+  document.getElementById('legend-to-stadium').style.opacity = directionFilter === 'from_stadium' ? '.35' : '1';
+  document.getElementById('legend-from-stadium').style.opacity = directionFilter === 'to_stadium' ? '.35' : '1';
+
+  if(STREET_MATCH_AVAILABLE){
+    document.getElementById('street-match-note').classList.remove('visible');
+    document.getElementById('map-mode-toggle').style.display = 'flex';
+    document.getElementById('mode-filter-toggle').style.display = 'flex';
+    document.getElementById('color-legend').style.display = 'block';
+    document.getElementById('top20-toggle').style.display = 'block';
+    document.getElementById('share-mode-toggle').style.display = 'block';
+    renderStreetSegments(lots, residencyFilter);
+  } else {
+    document.getElementById('street-match-note').classList.add('visible');
+    document.getElementById('map-mode-toggle').style.display = 'none';
+    document.getElementById('mode-filter-toggle').style.display = 'none';
+    document.getElementById('color-legend').style.display = 'none';
+    document.getElementById('top20-toggle').style.display = 'none';
+    document.getElementById('share-mode-toggle').style.display = 'none';
+    renderStraightLineFallback(lots);
+    renderRankedPointsChart();
+  }
+
+  let deviceSet = new Set(), toTimes = [], fromTimes = [], localCount=0, visitorCount=0, totalCount=0;
+  PRIMARY_DATA.routes.forEach(r=>{
+    if(!lots.includes(r.lot)) return;
+    if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    if(!passesDateFilter(r)) return;
+    deviceSet.add(r.device_id);
+    if(r.direction === 'to_stadium') toTimes.push(r.minutes_to_stadium);
+    else fromTimes.push(r.minutes_to_stadium);
+    totalCount++;
+    if(r.residency === 'local') localCount++;
+    if(r.residency === 'visitor') visitorCount++;
+  });
+
+  document.getElementById('hud-devices').textContent = deviceSet.size;
+  document.getElementById('hud-time-in').textContent = toTimes.length ? median(toTimes).toFixed(0)+' min' : '–';
+  document.getElementById('hud-time-out').textContent = fromTimes.length ? median(fromTimes).toFixed(0)+' min' : '–';
+  document.getElementById('hud-res').textContent = totalCount
+    ? Math.round(100*localCount/totalCount)+'% / '+Math.round(100*visitorCount/totalCount)+'%'
+    : '–';
+
+  allLotNames.forEach(lot=>{
+    const active = lots.includes(lot);
+    lotMarkers[lot].setStyle({fillOpacity: active ? 1 : .2, opacity: active ? 1 : .2});
+  });
+
+  renderCharts(lots, residencyFilter);
+}
+
+/* ============================================================== */
+/* CHARTS                                                            */
+/* ============================================================== */
+let deviceChart, residencyChart, histogramChart, entryPointsChart, extrapolationChart;
+
+function renderCharts(selectedLots, residencyFilter){
+  renderDeviceChart(selectedLots);
+  renderExtrapolationChart(selectedLots);
+  renderResidencyChart(selectedLots);
+  renderHistogramChart(selectedLots, residencyFilter);
+  renderTimeOfDayChart(selectedLots, residencyFilter);
+}
+
+function renderExtrapolationChart(selectedLots){
+  const ctx = document.getElementById('chart-extrapolation');
+  const noteEl = document.getElementById('extrapolation-note');
+  const calib = EXTRAPOLATION_CALIBRATION;
+
+  if(!calib || !calib.matched_dates){
+    if(extrapolationChart) extrapolationChart.destroy();
+    extrapolationChart = null;
+    noteEl.textContent = 'No extrapolation calibration available for this run (needs --street-match-independent date overlap with the official event calendar -- re-run the pipeline to generate extrapolation_calibration.json).';
+    return;
+  }
+
+  const rows = PRIMARY_DATA.lot_summary
+    .filter(r => selectedLots.includes(r.lot) && r.estimated_actual_devices != null)
+    .sort((a,b) => b.estimated_actual_devices - a.estimated_actual_devices);
+
+  if(!rows.length){
+    if(extrapolationChart) extrapolationChart.destroy();
+    extrapolationChart = null;
+    noteEl.textContent = 'No estimated attendance figures for the currently selected lot(s).';
+    return;
+  }
+
+  noteEl.innerHTML =
+    `Calibrated against <b>${calib.matched_dates} real events</b> from the official Stadium ` +
+    `Authority attendance filings (pooled sampling rate ${calib.pooled_sampling_rate_pct}%, ` +
+    `~1 confirmed device per ${Math.round(1/calib.pooled_sampling_rate_pct*100)} actual attendees). ` +
+    `This reflects the full year's calendar-matched dates only -- it does <b>not</b> change with ` +
+    `the date-range or event-type filters above, only the lot selection. Individual dates varied ` +
+    `${calib.min_rate_pct}%-${calib.max_rate_pct}%, so treat any single number as order-of-magnitude, ` +
+    `not precise.`;
+
+  const cfg = {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.lot),
+      datasets: [{ data: rows.map(r => r.estimated_actual_devices), backgroundColor: '#3ec9a7' }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => {
+          const r = rows[ctx.dataIndex];
+          return `~${ctx.raw.toLocaleString()} estimated actual devices (${r.device_count} confirmed in our sample)`;
+        }}}
+      },
+      scales: {
+        x: { ticks: { color: '#c9cdd6', font: { size: 9 }, callback: (v) => v >= 1000 ? (v/1000)+'k' : v }, grid: { color: '#2a2e38' } },
+        y: { ticks: { color: '#c9cdd6', font: { size: 9 } }, grid: { display: false } }
+      },
+      responsive: true, maintainAspectRatio: false,
+    }
+  };
+  if(extrapolationChart) extrapolationChart.destroy();
+  extrapolationChart = new Chart(ctx, cfg);
+}
+
+function renderDeviceChart(selectedLots){
+  const rows = computeLiveLotSummary().filter(r=>selectedLots.includes(r.lot))
+    .sort((a,b)=>b.device_count - a.device_count);
+  const ctx = document.getElementById('chart-devices');
+  const cfg = {
+    type:'bar',
+    data:{
+      labels: rows.map(r=>r.lot),
+      datasets:[{ data: rows.map(r=>scaledCount(r.device_count)),
+        backgroundColor: rows.map(r=>LOT_COLORS[r.lot]) }]
+    },
+    options:{
+      indexAxis:'y', plugins:{legend:{display:false},
+        tooltip:{callbacks:{label: (ctx)=>{
+          const r = rows[ctx.dataIndex];
+          return `~${ctx.raw.toLocaleString()} estimated (${r.device_count} confirmed in sample)`;
+        }}}
+      },
+      scales:{
+        x:{ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> v>=1000 ? (v/1000)+'k' : v}, grid:{color:'#2a2e38'}},
+        y:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+      },
+      responsive:true, maintainAspectRatio:false
+    }
+  };
+  if(deviceChart) deviceChart.destroy();
+  deviceChart = new Chart(ctx, cfg);
+}
+
+function renderResidencyChart(selectedLots){
+  const rows = computeLiveLotSummary().filter(r=>selectedLots.includes(r.lot))
+    .sort((a,b)=>b.device_count - a.device_count);
+  const ctx = document.getElementById('chart-residency');
+  const cfg = {
+    type:'bar',
+    data:{
+      labels: rows.map(r=>r.lot),
+      datasets:[
+        {label:'Local', data: rows.map(r=>r.local_pct), backgroundColor:'#3ec9a7'},
+        {label:'Visitor', data: rows.map(r=>r.visitor_pct), backgroundColor:'#b98cf2'},
+        {label:'Unknown', data: rows.map(r=>r.unknown_pct), backgroundColor:'#4a4f5c'},
+      ]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}}},
+      scales:{
+        x:{stacked:true, max:100, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{color:'#2a2e38'}},
+        y:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+      }
+    }
+  };
+  if(residencyChart) residencyChart.destroy();
+  residencyChart = new Chart(ctx, cfg);
+}
+
+function renderRankedPointsChart(){
+  const ctx = document.getElementById('chart-entry-points');
+  const noteEl = document.getElementById('entry-points-note');
+
+  if(!STREET_MATCH_AVAILABLE){
+    if(entryPointsChart) entryPointsChart.destroy();
+    entryPointsChart = null;
+    noteEl.textContent = 'This ranking needs street-matched data (re-run the pipeline with --street-match).';
+    return;
+  }
+
+  if(rankingMode === 'top20'){
+    const ranked = computeTop20Corridors(lastCorridorStats, lastCorridorBounds);
+    if(!ranked.length){
+      if(entryPointsChart) entryPointsChart.destroy();
+      entryPointsChart = null;
+      noteEl.textContent = 'No streets for the current selection.';
+      return;
+    }
+    noteEl.textContent = 'The 20 streets carrying the most device traffic for the current selection -- named-street corridors, so a divided road\'s carriageways are counted together rather than split.';
+    const cfg = {
+      type:'bar',
+      data:{
+        labels: ranked.map(e=> e.corridor.length > 18 ? e.corridor.slice(0,17)+'…' : e.corridor),
+        datasets:[{ data: ranked.map(e=> shareMode ? 100*e.total/lastTotalLegs : scaledCount(e.total)), backgroundColor: '#ffb648' }]
+      },
+      options:{
+        indexAxis:'y', plugins:{legend:{display:false},
+          tooltip:{callbacks:{
+            title: (items)=> ranked[items[0].dataIndex].corridor,
+            label: (ctx)=>{
+              const e = ranked[ctx.dataIndex];
+              return `${fmtCount(e.total, lastTotalLegs)} · local ${e.local} · visitor ${e.visitor} · avg ${e.avgMinutes.toFixed(1)} min`;
+            }
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#2a2e38'}},
+          y:{ticks:{color:'#c9cdd6',font:{size:8}}, grid:{display:false}}
+        },
+        responsive:true, maintainAspectRatio:false,
+        onClick:(evt, elements)=>{
+          if(!elements.length) return;
+          const e = ranked[elements[0].index];
+          if(e.bounds) map.flyToBounds(e.bounds, {maxZoom:18, duration:0.6});
+        }
+      }
+    };
+    if(entryPointsChart) entryPointsChart.destroy();
+    entryPointsChart = new Chart(ctx, cfg);
+    return;
+  }
+
+  const points = rankingMode === 'exit' ? lastExitPoints : lastEntryPoints;
+  if(!points.length){
+    if(entryPointsChart) entryPointsChart.destroy();
+    entryPointsChart = null;
+    noteEl.textContent = `No ${rankingMode} points for the current selection.`;
+    return;
+  }
+  noteEl.textContent = rankingMode === 'entry'
+    ? 'The first street corridor each inbound trip touches -- where foot traffic enters the mapped street network on its way to the stadium, split by residency.'
+    : 'The last street corridor each outbound (post-event) trip touches -- where foot traffic leaves the mapped street network heading back to a lot, split by residency.';
+
+  const denom = rankingMode === 'entry' ? lastTotalToStadium : lastTotalFromStadium;
+  const asVal = (n) => shareMode ? 100*n/denom : scaledCount(n);
+
+  const cfg = {
+    type:'bar',
+    data:{
+      labels: points.map(e=> e.corridor.length > 18 ? e.corridor.slice(0,17)+'…' : e.corridor),
+      datasets:[
+        {label:'Local', data: points.map(e=>asVal(e.local)), backgroundColor:'#3ec9a7'},
+        {label:'Visitor', data: points.map(e=>asVal(e.visitor)), backgroundColor:'#b98cf2'},
+        {label:'Unknown', data: points.map(e=>asVal(e.unknown)), backgroundColor:'#4a4f5c'},
+      ]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}},
+        tooltip:{callbacks:{
+          title: (items)=> points[items[0].dataIndex].corridor,
+          label: (ctx)=>{
+            const e = points[ctx.dataIndex];
+            const raw = ctx.dataset.label === 'Local' ? e.local : ctx.dataset.label === 'Visitor' ? e.visitor : e.unknown;
+            return `${ctx.dataset.label}: ${fmtCount(raw, denom)} (${fmtCount(e.total, denom)} total here)`;
+          }
+        }}
+      },
+      scales:{
+        x:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#2a2e38'}},
+        y:{stacked:true, ticks:{color:'#c9cdd6',font:{size:8}}, grid:{display:false}}
+      },
+      onClick:(evt, elements)=>{
+        if(!elements.length) return;
+        const e = points[elements[0].index];
+        if(e.bounds) map.flyToBounds(e.bounds, {maxZoom:18, duration:0.6});
+      }
+    }
+  };
+  if(entryPointsChart) entryPointsChart.destroy();
+  entryPointsChart = new Chart(ctx, cfg);
+}
+
+function buildHistogramBins(minutesArr, binSize){
+  const max = Math.max(60, ...minutesArr, 0);
+  const nBins = Math.ceil(max / binSize);
+  const counts = new Array(nBins).fill(0);
+  minutesArr.forEach(m=>{
+    const idx = Math.min(nBins-1, Math.floor(m / binSize));
+    if(idx >= 0) counts[idx]++;
+  });
+  const labels = counts.map((_,i)=>`${i*binSize}-${(i+1)*binSize}`);
+  return {labels, counts};
+}
+
+function renderHistogramChart(selectedLots, residencyFilter){
+  const ctx = document.getElementById('chart-histogram');
+  const datasets = [];
+  events.forEach((ev, i)=>{
+    const minutes = ev.data.routes
+      .filter(r=> (ev.id !== 'primary' || selectedLots.includes(r.lot)))
+      .filter(r=> r.direction === 'to_stadium')
+      .filter(r=> ev.id !== 'primary' || residencyFilter === 'all' || r.residency === residencyFilter)
+      .filter(r=> ev.id !== 'primary' || passesDateFilter(r))
+      .map(r=>r.minutes_to_stadium);
+    if(!minutes.length) return;
+    const {labels, counts} = buildHistogramBins(minutes, histogramBin);
+    datasets.push({ label: ev.meta.name || ev.id, data: counts, backgroundColor: ev.color + 'cc', __labels: labels });
+  });
+  const labels = datasets.length ? datasets[0].__labels : [];
+  const cfg = {
+    type:'bar',
+    data:{ labels, datasets: datasets.map(d=>({label:d.label, data:d.data, backgroundColor:d.backgroundColor})) },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display: events.length>1, position:'top', labels:{color:'#c9cdd6', font:{size:9}}}},
+      scales:{
+        x:{title:{display:true, text:'Minutes to stadium', color:'#7d8394', font:{size:9}},
+           ticks:{color:'#7d8394',font:{size:8}}, grid:{display:false}},
+        y:{title:{display:true, text:'Devices', color:'#7d8394', font:{size:9}},
+           ticks:{color:'#7d8394',font:{size:9}}, grid:{color:'#2a2e38'}}
+      }
+    }
+  };
+  if(histogramChart) histogramChart.destroy();
+  histogramChart = new Chart(ctx, cfg);
+  document.getElementById('histogram-note').textContent = events.length > 1
+    ? `Comparing ${events.length} events. Loaded events show all lots/residency; the primary event respects your current filters.`
+    : 'Filtered to your current lot + residency selection, outbound (to-stadium) trips only.';
+}
+
+let timeOfDayChart;
+
+function renderTimeOfDayChart(selectedLots, residencyFilter){
+  const ctx = document.getElementById('chart-time-of-day');
+  const noteEl = document.getElementById('tod-note');
+
+  const toCounts = new Array(24).fill(0);
+  const fromCounts = new Array(24).fill(0);
+  let anyTimedTrips = false, untimedTrips = 0;
+
+  PRIMARY_DATA.routes.forEach(r=>{
+    if(!selectedLots.includes(r.lot)) return;
+    if(residencyFilter !== 'all' && r.residency !== residencyFilter) return;
+    if(!passesDateFilter(r)) return;
+    if(r.departure_hour === null || r.departure_hour === undefined){
+      untimedTrips++;
+      return;
+    }
+    anyTimedTrips = true;
+    (r.direction === 'to_stadium' ? toCounts : fromCounts)[r.departure_hour]++;
+  });
+
+  const labels = Array.from({length:24}, (_,h)=> h.toString().padStart(2,'0') + ':00');
+  const cfg = {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Arriving (to stadium)', data: toCounts, backgroundColor:'#ffb648'},
+        {label:'Leaving (from stadium)', data: fromCounts, backgroundColor:'#a6192e'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}}},
+      scales:{
+        x:{ticks:{color:'#7d8394',font:{size:8}, maxRotation:0, autoSkip:true, maxTicksLimit:12}, grid:{display:false}},
+        y:{title:{display:true, text:'Devices', color:'#7d8394', font:{size:9}},
+           ticks:{color:'#7d8394',font:{size:9}}, grid:{color:'#2a2e38'}}
+      }
+    }
+  };
+  if(timeOfDayChart) timeOfDayChart.destroy();
+  timeOfDayChart = new Chart(ctx, cfg);
+
+  noteEl.textContent = anyTimedTrips
+    ? `Local (Pacific) time each trip began.${untimedTrips ? ` ${untimedTrips} trip(s) had no absolute timestamp available and aren't shown.` : ''}`
+    : 'No trips with a usable timestamp in the current selection -- this needs a pathing export with a real per-ping timestamp column (see README).';
+}
+
+/* ============================================================== */
+/* CONTROLS                                                          */
+/* ============================================================== */
+function paintChip(chip, on){
+  chip.classList.toggle('active', on);
+  chip.style.background = on ? LOT_COLORS[chip.dataset.lot] : 'var(--panel)';
+  chip.style.color = on ? '#0c0d10' : 'var(--silver)';
+}
+
+const lotToggleContainer = document.getElementById('lot-toggles');
+allLotNames.forEach(lot=>{
+  const chip = document.createElement('div');
+  chip.className = 'lot-chip active';
+  chip.textContent = lot;
+  chip.dataset.lot = lot;
+  paintChip(chip, true);
+  chip.addEventListener('click', ()=>{
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    if(activeLots.has(lot)){ activeLots.delete(lot); } else { activeLots.add(lot); }
+    paintChip(chip, activeLots.has(lot));
+    renderMap([...activeLots], activeResidency);
+  });
+  lotToggleContainer.appendChild(chip);
+});
+
+/* ============================================================== */
+/* DATE RANGE FILTER                                                 */
+/* ============================================================== */
+function updateDateNote(){
+  const noteEl = document.getElementById('date-range-note');
+  const inRange = PRIMARY_DATA.routes.filter(passesDateFilter).length;
+  const eventLabel = activeEventType !== 'all' ? ` (${EVENT_TYPE_LABELS[activeEventType]} only)` : '';
+  if(!activeDateStart && !activeDateEnd && activeEventType === 'all'){
+    noteEl.textContent = MIN_TRIP_DATE
+      ? `Showing all ${ALL_TRIP_DATES.length} dates in this export (${MIN_TRIP_DATE} to ${MAX_TRIP_DATE}), ${inRange} trips total. If this covers more than one event, narrow the range below to isolate a single game or day.`
+      : 'No trip dates available in this export.';
+  } else if(!activeDateStart && !activeDateEnd){
+    noteEl.textContent = `${inRange} trips${eventLabel}.`;
+  } else {
+    noteEl.textContent = `${inRange} trips between ${activeDateStart || 'the start'} and ${activeDateEnd || 'the end'}${eventLabel}.`;
+  }
+}
+
+function applyDateFilter(){
+  manualOverride = true;
+  document.getElementById('override-note').classList.add('visible');
+  updateDateNote();
+  renderMap([...activeLots], activeResidency);
+}
+
+if(MIN_TRIP_DATE){
+  const startInput = document.getElementById('date-start-input');
+  const endInput = document.getElementById('date-end-input');
+  startInput.min = endInput.min = MIN_TRIP_DATE;
+  startInput.max = endInput.max = MAX_TRIP_DATE;
+  startInput.addEventListener('change', ()=>{ activeDateStart = startInput.value || null; applyDateFilter(); });
+  endInput.addEventListener('change', ()=>{ activeDateEnd = endInput.value || null; applyDateFilter(); });
+
+  document.getElementById('date-reset-btn').addEventListener('click', ()=>{
+    activeDateStart = null; activeDateEnd = null;
+    startInput.value = ''; endInput.value = '';
+    document.querySelectorAll('#busiest-dates-row button').forEach(b=>b.classList.remove('active'));
+    applyDateFilter();
+  });
+
+  // Quick-pick chips for the 12 busiest single dates -- labeled with the
+  // real event name where we have one, so this doubles as "jump to a known
+  // game/concert" rather than just "jump to a big number."
+  const busiest = [...DATE_COUNTS.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const row = document.getElementById('busiest-dates-row');
+  busiest.forEach(([date, count])=>{
+    const chip = document.createElement('button');
+    const ev = EVENT_CALENDAR[date];
+    chip.textContent = ev ? `${ev.name} — ${date} (${count})` : `${date} (${count})`;
+    if(ev) chip.style.borderColor = EVENT_TYPE_COLORS[ev.type];
+    chip.addEventListener('click', ()=>{
+      document.querySelectorAll('#busiest-dates-row button').forEach(b=>b.classList.remove('active'));
+      chip.classList.add('active');
+      activeDateStart = date; activeDateEnd = date;
+      startInput.value = date; endInput.value = date;
+      applyDateFilter();
+    });
+    row.appendChild(chip);
+  });
+} else {
+  document.getElementById('date-start-input').disabled = true;
+  document.getElementById('date-end-input').disabled = true;
+  document.getElementById('date-reset-btn').disabled = true;
+}
+
+document.querySelectorAll('#event-type-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#event-type-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeEventType = btn.dataset.eventType;
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    updateDateNote();
+    renderMap([...activeLots], activeResidency);
+  });
+});
+updateDateNote();
+
+document.getElementById('lots-all').addEventListener('click', ()=>{
+  manualOverride = true;
+  document.getElementById('override-note').classList.add('visible');
+  activeLots = new Set(allLotNames);
+  document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, true));
+  renderMap([...activeLots], activeResidency);
+});
+document.getElementById('lots-none').addEventListener('click', ()=>{
+  manualOverride = true;
+  document.getElementById('override-note').classList.add('visible');
+  activeLots = new Set();
+  document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, false));
+  renderMap([], activeResidency);
+});
+
+document.querySelectorAll('.res-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    document.querySelectorAll('.res-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeResidency = btn.dataset.res;
+    renderMap([...activeLots], activeResidency);
+  });
+});
+
+document.querySelectorAll('.hl[data-lot]').forEach(span=>{
+  span.style.background = LOT_COLORS[span.dataset.lot] || 'var(--torch-amber)';
+  span.addEventListener('click', ()=>{
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    activeLots = new Set([span.dataset.lot]);
+    document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, c.dataset.lot === span.dataset.lot));
+    renderMap([span.dataset.lot], activeResidency);
+  });
+});
+document.querySelectorAll('.hl[data-res]').forEach(span=>{
+  span.style.background = span.dataset.res === 'local' ? 'var(--local-teal)' : 'var(--visitor-violet)';
+});
+
+document.querySelectorAll('#map-mode-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#map-mode-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    mapMode = btn.dataset.mode;
+    renderMap([...activeLots], activeResidency);
+  });
+});
+
+document.querySelectorAll('#ranking-mode-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#ranking-mode-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    rankingMode = btn.dataset.ranking;
+    renderRankedPointsChart();
+  });
+});
+
+document.getElementById('top20-toggle').addEventListener('click', (e)=>{
+  top20Highlight = !top20Highlight;
+  e.target.classList.toggle('active', top20Highlight);
+  e.target.textContent = (top20Highlight ? '★' : '☆') + ' Highlight top 20 busiest streets';
+  renderMap([...activeLots], activeResidency);
+});
+
+document.getElementById('share-mode-toggle').addEventListener('click', (e)=>{
+  shareMode = !shareMode;
+  e.target.classList.toggle('active', shareMode);
+  e.target.textContent = (shareMode ? '#' : '%') + (shareMode ? ' Show as device count' : ' Show as share of trips');
+  renderMap([...activeLots], activeResidency);
+});
+
+document.querySelectorAll('#direction-filter-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#direction-filter-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    directionFilter = btn.dataset.direction;
+    renderMap([...activeLots], activeResidency);
+  });
+});
+
+document.querySelectorAll('#mode-filter-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#mode-filter-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    modeFilter = btn.dataset.tripMode;
+    renderMap([...activeLots], activeResidency);
+  });
+});
+
+document.getElementById('fullscreen-toggle').addEventListener('click', ()=>{
+  const mapZone = document.querySelector('.map-zone');
+  if(!document.fullscreenElement){
+    mapZone.requestFullscreen().catch(err=>console.warn('Fullscreen request failed:', err));
+  } else {
+    document.exitFullscreen();
+  }
+});
+document.addEventListener('fullscreenchange', ()=>{
+  const btn = document.getElementById('fullscreen-toggle');
+  const isFs = !!document.fullscreenElement;
+  btn.textContent = isFs ? '⤢ Exit fullscreen' : '⛶ Fullscreen';
+  // Leaflet needs to recompute its size after the container's actual
+  // on-screen dimensions change; a short delay lets the fullscreen
+  // transition finish first.
+  setTimeout(()=> map.invalidateSize(), 150);
+});
+
+document.getElementById('flow-pause-toggle').addEventListener('click', (e)=>{
+  const mapZone = document.querySelector('.map-zone');
+  const paused = mapZone.classList.toggle('flow-paused');
+  e.target.textContent = paused ? '▶ Resume flow animation' : '⏸ Pause flow animation';
+});
+
+document.querySelectorAll('#bin-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#bin-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    histogramBin = parseInt(btn.dataset.bin, 10);
+    renderHistogramChart([...activeLots], activeResidency);
+  });
+});
+
+/* ============================================================== */
+/* MULTI-EVENT COMPARISON (client-side file load, no server)         */
+/* ============================================================== */
+document.getElementById('event-file-input').addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  for(const file of files){
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if(!parsed.routes) throw new Error('missing routes[]');
+      const id = 'event_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+      const color = PALETTE[events.length % PALETTE.length];
+      const meta = parsed.event_meta || {name: file.name.replace('.json',''), date:'', type:'unknown'};
+      events.push({id, meta, data: parsed, color});
+      const chip = document.createElement('div');
+      chip.className = 'event-chip';
+      chip.innerHTML = `<span><i class="swatch-dot" style="background:${color}"></i>${meta.name}${meta.type && meta.type!=='unknown' ? ' · '+meta.type : ''}</span>`;
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = '×';
+      removeBtn.style.cssText = 'background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;';
+      removeBtn.addEventListener('click', ()=>{
+        const idx = events.findIndex(ev=>ev.id===id);
+        if(idx>-1) events.splice(idx,1);
+        chip.remove();
+        renderHistogramChart([...activeLots], activeResidency);
+      });
+      chip.appendChild(removeBtn);
+      document.getElementById('event-chip-list').appendChild(chip);
+    }catch(err){
+      alert('Could not load ' + file.name + ': ' + err.message);
+    }
+  }
+  renderHistogramChart([...activeLots], activeResidency);
+  e.target.value = '';
+});
+
+/* ============================================================== */
+/* SCROLLYTELLING (paused once the user manually sets filters)       */
+/* ============================================================== */
+const steps = document.querySelectorAll('.step');
+const stepObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      steps.forEach(s=>s.classList.remove('is-active'));
+      entry.target.classList.add('is-active');
+      if(manualOverride) return; // don't fight the user's own selection
+      const lotsAttr = entry.target.dataset.lots;
+      const resAttr = entry.target.dataset.residency || 'all';
+      const lots = lotsAttr === 'all' ? allLotNames : [lotsAttr];
+      activeLots = new Set(lots);
+      document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, activeLots.has(c.dataset.lot)));
+      activeResidency = resAttr;
+      document.querySelectorAll('.res-btn').forEach(b=>b.classList.toggle('active', b.dataset.res===resAttr));
+      renderMap(lots, resAttr);
+    }
+  });
+}, {root:null, threshold:0.55});
+steps.forEach(s=>stepObserver.observe(s));
+
+/* ============================================================== */
+/* INITIAL RENDER                                                    */
+/* ============================================================== */
+renderMap('all', 'all');
+</script>
+</body>
+</html>
