@@ -1067,6 +1067,77 @@ def refine_street_types(street_classification: dict, slice_counts: dict,
     return out
 
 
+ARTERIAL_HIGHWAY_TAGS = {"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link",
+                         "secondary", "secondary_link"}
+
+
+def compute_walkin_corridor_counts(routes: list[dict], edge_corridors: dict) -> tuple[dict, int]:
+    """From the stadium-anchored lot-to-stadium trips (routes.json, the data behind the
+    Volume / Local-vs-Visitor maps), count for each street corridor how many WALKING trips
+    touched it. Returns ({corridor: n_walking_trips}, total_walking_trips). Corridors are
+    matched by name, which is how named streets are keyed in both runs."""
+    counts: dict[str, int] = {}
+    total = 0
+    for r in routes:
+        if r.get("mode") != "walking":
+            continue
+        total += 1
+        for c in {edge_corridors.get(e, e) for e in r.get("matched_edges", [])}:
+            counts[c] = counts.get(c, 0) + 1
+    return counts, total
+
+
+def assign_street_roles(street_classification: dict, refined: dict, walkin_counts: dict, walkin_total: int,
+                        min_walkin_share: float = 0.05, min_ped_observations: int = 300,
+                        min_baseline_votes: int = 200) -> dict:
+    """Final street roles, by design intent:
+
+      gateway            -- an arterial (OSM motorway/trunk/primary/secondary): moves people and
+                            vehicles into and out of the district, whatever mix it carries.
+      pedestrian_corridor-- a NON-arterial with heavy pedestrian use: (a) it carries at least
+                            min_walkin_share of all walking lot-to-stadium trips (the Volume map's
+                            preferred walk-in routes) AND (b) it has at least min_ped_observations
+                            walking/stationary observations on ordinary (non-event) days in the
+                            district-wide data. Absolute pedestrian volume, not share: a street can
+                            carry heavy car traffic and still be a heavily used pedestrian street.
+      local_street       -- everything else (low confidence when baseline data is thin).
+
+    Event-day surges stay a separate flag (event_pedestrian_flag) and never decide the role.
+    An arterial that is also a major walk-in route is marked also_walkin_route (dual role).
+    Input `refined` comes from refine_street_types; returns an updated copy.
+    """
+    out = {}
+    for corridor, r in refined.items():
+        cls = street_classification.get(corridor, {})
+        hw = cls.get("majority_highway")
+        if isinstance(hw, (list, tuple)):
+            hw = hw[0] if hw else None
+        votes = r.get("baseline_votes") or 0
+        ped_obs = int(round((r.get("baseline_ped_share") or 0) * votes))
+        n_walk = walkin_counts.get(corridor, 0)
+        w_share = (n_walk / walkin_total) if walkin_total else None
+        heavy_walkin = w_share is not None and w_share >= min_walkin_share
+        heavy_ped = ped_obs >= min_ped_observations
+        if hw in ARTERIAL_HIGHWAY_TAGS:
+            role, reason = "gateway", f"arterial (OSM {hw})"
+        elif heavy_walkin and heavy_ped:
+            role, reason = "pedestrian_corridor", (
+                f"carries {w_share:.0%} of walking lot-to-stadium trips and {ped_obs} ordinary-day pedestrian observations")
+        else:
+            role, reason = "local_street", "non-arterial without heavy pedestrian use"
+        new = dict(r)
+        new.update({
+            "ped_share_type": r.get("ped_share_type", r.get("refined_type")),
+            "refined_type": role, "role_reason": reason,
+            "ped_obs_ordinary": ped_obs, "walkin_trips": n_walk,
+            "walkin_share": None if w_share is None else round(w_share, 4),
+            "also_walkin_route": bool(role == "gateway" and heavy_walkin),
+            "low_data": votes < min_baseline_votes,
+        })
+        out[corridor] = new
+    return out
+
+
 def build_route_sequences(
     pathing: pd.DataFrame,
     qualifying_trips: pd.DataFrame,

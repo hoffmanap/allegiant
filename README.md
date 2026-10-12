@@ -8,6 +8,7 @@ a local-vs-visitor split and a lot-by-lot / aggregated picker.
 stadium-pathing/
 ├── pathing_pipeline.py     # cleans + aggregates raw Azira exports (stadium-anchored pathing)
 ├── district_wide_street_analysis.py  # standalone street-type analysis (district-wide extract)
+├── retype_streets.py       # re-applies the final street-role rules to existing outputs (fast)
 ├── build_dashboard.py      # builds index.html from index_template.html + output folders
 ├── make_sample_data.py     # generates synthetic test data for a dry run
 ├── index_template.html     # dashboard source
@@ -69,53 +70,75 @@ when explaining the work.
    not people who work in the district, so it supports the assumption but is
    not proof. With it, arterials (Dean Martin Dr, Tropicana Ave, Valley View
    Blvd, Russell Rd, Hacienda Ave) are reliably gateways.
-7. **Re-scoped the question.** Gateways are settled, so the mode split is not the
-   headline. What remains is to separate heavy pedestrian corridors from other
-   local access streets, without letting event days skew the answer but still
-   accounting for them. That produced the routine-baseline + event-flag design
-   (section 8d).
+7. **Re-scoped the question.** The mode split is not the headline. What matters
+   for design is the role each street plays, without letting event days skew
+   the answer but still accounting for them. First attempt: type non-gateway
+   streets by ordinary-day pedestrian *share* (>= 50%), with an event flag.
 8. **Cadence confound.** Event dates fall mostly in the fall season, and GPS
    cadence varies by month (median gap about 3 s in Jan-Apr 2025, about 40 s in
    Jun-Jul 2025, 6-21 s afterwards). Dean Martin Dr showed that the apparent
    event effect disappears when event days are compared with non-event days
    from the same season. So the event comparison is month-matched.
 
+9. **Share was the wrong measure; use volume, backed by the walk-in routes.**
+   The share rule found almost no pedestrian streets and missed obvious ones:
+   Polaris Avenue carries heavy car traffic *and* heavy pedestrian traffic, so
+   its pedestrian share (42%) looks like any other street. What matters for
+   design is how many people walk it. The roles are now defined by design intent:
+   arterials are gateways; non-arterials with heavy pedestrian *volume* are
+   pedestrian streets; everything else is local. And pedestrian designation must be
+   supported by the walk-in routes (Volume map, analysis A), so the two analyses
+   corroborate each other instead of standing alone.
+
 ### Final design (what the dashboard and outputs mean)
 
-- **Label = ordinary days only.** Event days cannot create a pedestrian label.
-- **Event days = a separate flag**, measured against same-month ordinary days.
-- **Pedestrian share is a relative ranking**, from speed between GPS pings. It
-  is not a count of pedestrians. Even the best arterials read only about 60-65%
-  vehicle.
-- **Uncertainty is shown, not hidden:** streets with under 200 routine
-  observations are `insufficient_data`; thin streets are marked low confidence.
+- **Gateway** = arterial by OpenStreetMap class (motorway / trunk / primary /
+  secondary), regardless of its mode mix. Tertiary roads are no longer gateways
+  by default.
+- **Pedestrian street** = non-arterial that (a) carries >= 5% of all *walking*
+  lot-to-stadium trips (analysis A) **and** (b) has >= 300 walking/stationary
+  observations on ordinary days in the district-wide data (analysis B).
+  Absolute volume, not share.
+- **Local street** = everything else; drawn dashed when it has fewer than 200
+  ordinary-day observations.
+- **Dual role:** an arterial that is also a major walk-in route (West Hacienda
+  Avenue, 14.8% of walking trips) stays a gateway and is flagged
+  `also_walkin_route`.
+- **Event days = a separate flag** (`event_pedestrian_flag`), measured against
+  same-month ordinary days; it never decides the role.
+- **Pedestrian observations are relative signals**, from speed between GPS
+  pings, not counts of people. The walk-in routes are the measured support.
 
-### Results (district-wide run, `--biking-as-wheeled`, 300k legs, seed 0)
+### Results (district-wide run, `--biking-as-wheeled`, 300k legs, seed 0, final roles)
 
-| Type | Count | Streets |
+| Role | Count | Streets |
 |---|---|---|
-| Gateway | 14 | Dean Martin Dr, W Tropicana Ave, S Valley View Blvd, W Russell Rd, W Hacienda Ave, Polaris Ave, Joey Bishop Dr, W Oquendo Rd, W Sunset Rd, Arville St, Wynn Rd, Diablo Dr, W Post Rd, Allegiant Stadium Way |
-| Pedestrian corridor (routine) | 3 | Al Davis Way (50.4%), Rousso Rd (57.5%), W Patrick Ln (53.3%) |
-| Event-day pedestrian corridor | 1 | Graphic Center Dr (42% routine, 54% event days) |
-| Local street | 12 | Procyon St, Bell Dr, Ali Baba Ln, Ponderosa Way, Schuster St, Quail Ave, ... |
-| Insufficient data | 10 | minor streets below 200 routine observations |
+| Gateway (arterial) | 7 | Dean Martin Dr, W Tropicana Ave, S Valley View Blvd, W Russell Rd, W Hacienda Ave, Joey Bishop Dr, W Sunset Rd |
+| Pedestrian street | 3 | **Polaris Ave** (11.7% of walking trips, 3,304 ordinary-day observations), **Al Davis Way** (16.0%, 1,082), **Allegiant Stadium Way** (14.8%, 376) |
+| Local street | 30 | everything else, including the former tertiary "gateways" (Wynn Rd, Oquendo Rd, Diablo Dr, Arville St, Post Rd) |
 
-Event-day pedestrian surges (month-matched shift): **Allegiant Stadium Way**
-+20.0 pts (gateway, flagged), **Al Davis Way** +16.2 pts, **Graphic Center Dr**
-+10.3 pts (weak). All 14 gateways move by under 5 points on event days.
+West Hacienda Avenue is an arterial that is also a major walk-in route (14.8%).
+Event-day pedestrian surges (month-matched, flag only): Allegiant Stadium Way
++20.0 pts, Al Davis Way +16.2 pts, Graphic Center Dr +10.3 pts (a local street,
+weak signal).
 
 ### Caveats to state when presenting this
 
 - Mode is inferred from speed between pings; this cannot cleanly separate slow
   cars from walkers. Treat shares as relative.
-- Al Davis Way's *routine* label is borderline (50.4% overall, 46.2% in
-  same-month comparison); its event-day surge is the more robust finding.
-- Rousso Rd and W Patrick Ln rest on few observations (332 and 229).
+- The walk-in routes come from stadium trips, so a street away from the stadium
+  path cannot qualify as a pedestrian street even if people walk it (e.g. Rousso
+  Rd and W Patrick Ln have high pedestrian share but no walk-in route support).
+- Allegiant Stadium Way qualifies on 376 ordinary-day observations, close to the
+  300 floor; its walk-in route volume is the stronger support.
 - Why dense-ping months read less vehicle than sparse-ping months is not
   established; the month-matched comparison controls for it but does not explain it.
-- Thresholds (50% / 200 / 10 pts / 100) are judgment calls, exposed as flags.
+- Thresholds (5% of walking trips / 300 observations / 200 baseline / 10 pts) are judgment calls, exposed as flags.
 - Local streets Ali Baba Ln, Ponderosa Way and Oquendo Rd are *less* pedestrian
   on event days (about -8 to -10 pts), probably event vehicle traffic; not flagged.
+- Tertiary roads that earlier counted as gateways (Wynn, Oquendo, Diablo, Arville,
+  Post) are now local streets under the arterial definition; revisit if the
+  design intent treats some of them as district entries.
 - The merged district polygon has not been split by building.
 
 ### Checks that were run
@@ -579,7 +602,9 @@ It imports `pathing_pipeline.py`, so run it from the project folder.
 ```
 python district_wide_street_analysis.py --pathing 10178831_Clark_pathing_x_report.tsv.gz ^
   --max-legs 300000 --seed 0 --biking-as-wheeled ^
-  --event-calibration output\extrapolation_calibration.json --out district_wide_output_final2
+  --event-calibration output\extrapolation_calibration.json ^
+  --walkin-routes output\routes.json --walkin-edge-corridors output\edge_corridors.json ^
+  --out district_wide_output_final2
 ```
 
 **Population and performance**
@@ -599,25 +624,32 @@ python district_wide_street_analysis.py --pathing 10178831_Clark_pathing_x_repor
   default; raw `mode_counts` are always written). Rationale in section 0.
 - `--event-calibration <extrapolation_calibration.json>` supplies event dates for
   the event / non-event split. Without it everything is treated as baseline.
-- `--ped-share-threshold` (0.50), `--min-baseline-votes` (200),
+- `--walkin-routes`, `--walkin-edge-corridors`, `--min-walkin-share` (0.05),
+  `--min-ped-observations` (300), `--min-baseline-votes` (200),
   `--event-shift-threshold` (0.10), `--min-event-votes` (100).
+  (`--ped-share-threshold` is used only by the legacy share rule.)
 
-**Typing rules** (`refine_street_types`)
-- Gateways come from `classify_street_types` (vehicle-dominant plus a major OSM
-  class: primary / secondary / tertiary / trunk / motorway and their links).
-- Every other public corridor is typed from its **routine (non-event-day)**
-  baseline, so event days cannot skew the label. Pedestrian share =
-  (walking + stationary) / all classified (non-"unknown") votes.
-  - `pedestrian_corridor`: baseline share >= 0.50 with >= 200 baseline votes
-  - `event_pedestrian_corridor`: below that, but event-day share >= 0.50 and
-    >= month-matched baseline + 0.10 (needs >= 100 event votes)
-  - `local_street`: everything else; `insufficient_data`: < 200 baseline votes
+**Typing rules**
+- `refine_street_types` first computes, for every public corridor, the ordinary-day
+  pedestrian share, the month-matched event shift and the event flag
+  (`event_pedestrian_flag`).
+- `assign_street_roles` then sets the final role (`refined_type`):
+  - `gateway`: OSM arterial class (motorway / trunk / primary / secondary and links).
+  - `pedestrian_corridor`: non-arterial with >= `--min-walkin-share` (0.05) of all
+    walking lot-to-stadium trips AND >= `--min-ped-observations` (300) ordinary-day
+    walking/stationary observations. Absolute volume, not share.
+  - `local_street`: everything else (`low_data` when < 200 baseline observations).
+  - Walk-in volumes come from the stadium-anchored run (`routes.json` +
+    `edge_corridors.json`; trips with mode "walking"), via
+    `--walkin-routes` / `--walkin-edge-corridors`.
 - **Month-matched event comparison.** Event dates sit mostly in the fall season,
   and GPS ping cadence changes a lot by month, so the event shift compares
   event days with non-event days from the *same months* (non-event share
   re-weighted by the event votes' month mix). Output field:
-  `month_matched_baseline_ped_share`. Any street (gateways included) gets
-  `event_pedestrian_flag` when its shift passes the rule.
+  `month_matched_baseline_ped_share`.
+- To re-apply the role rules to existing outputs without the heavy run:
+  `python retype_streets.py --district-dir district_wide_output_final2 --routes output\routes.json --edge-corridors output\edge_corridors.json`
+  (keeps the previous file as `street_classification_refined_prev.json`).
 
 **Outputs:** `street_classification.json` (base typing),
 `street_classification_refined.json` (final types, routine / event shares, shift,
@@ -763,7 +795,8 @@ dashboard can load in its comparison picker.
 ### Reading each map (also summarized on the dashboard)
 
 - **Volume / Local vs. Visitor:** stadium-anchored walk-in trips, mostly event days.
-- **Street Type: Vehicle / Pedestrian:** district-wide extract; labels from ordinary days; amber marks an event-day pedestrian surge measured against same-month ordinary days.
+- **Street Type: Vehicle / Pedestrian:** gateways are arterials; pedestrian streets are non-arterials with heavy walking use backed by the walk-in routes (Volume map); amber marks an event-day pedestrian surge measured against same-month ordinary days.
+- The page opens with a "How to use this page" guide describing every filter, what it does and what it helps surface; the Street Type maps do not respond to the lot / date / residency filters.
 - The dashboard shows a short explainer under the map that changes with the selected map, and a "Method" section above the footer covering the two populations, why we use two, how streets are typed, how event days are handled, and the limits.
 
 ## 12. Known limitations

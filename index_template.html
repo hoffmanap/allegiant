@@ -395,6 +395,79 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
   <p class="byline">Source: Azira Pinnacle pathing &amp; visitation reports · anonymized, device-level GPS</p>
 </header>
 
+<section class="method guide" id="guide">
+  <p class="eyebrow">How to use this page</p>
+  <h2>What the filters do, and what they help you find</h2>
+  <p class="lede">The page has four maps and a set of filters. Some filters
+    only apply to the walk-in maps, so here is what each control does and what
+    question it helps answer.</p>
+
+  <div class="method-grid">
+    <div class="method-card">
+      <span class="tag">Map selector (top right of the map)</span>
+      <h3>Four maps, two questions</h3>
+      <ul>
+        <li><b>Volume</b> — which streets carry the most walkers between parking and
+          the stadium. Surfaces the <i>preferred walking routes</i> and choke points.</li>
+        <li><b>Local vs. Visitor</b> — the same routes colored by who uses them.
+          Surfaces whether Las Vegas residents and out-of-town visitors take different streets.</li>
+        <li><b>Street Type: Vehicle</b> — gateways (arterials) vs. local streets, from
+          district-wide data. Surfaces which streets move traffic in and out.</li>
+        <li><b>Street Type: Pedestrian</b> — streets with heavy pedestrian use, plus amber
+          event-day surges. Surfaces where to invest in sidewalks and amenities.</li>
+      </ul>
+      <p><b>Heads up:</b> the filters below the map apply to Volume and Local vs.
+        Visitor. The two Street Type maps are district-wide and do not change with them.</p>
+    </div>
+    <div class="method-card">
+      <span class="tag">Date range · Event type · busiest-date chips</span>
+      <h3>Pick a day, a game, or a season</h3>
+      <p>Narrow the walk-in maps to one date, a date range, one of the busiest dates, or
+        all dates of one event type (Raiders, UNLV, concerts, other). <b>Surfaces</b> how
+        route choice and walk times change with crowd size and event type — for example,
+        whether a sold-out Raiders game pushes people onto streets a smaller event never touches.</p>
+    </div>
+    <div class="method-card">
+      <span class="tag">Parking lots</span>
+      <h3>One lot, several, or all</h3>
+      <p>Select any lot (or combination) to see only the trips that started there.
+        <b>Surfaces</b> which streets each lot funnels its walkers onto, and which lots
+        depend on the same corridors. Lots with few qualifying devices are flagged low-confidence.</p>
+    </div>
+    <div class="method-card">
+      <span class="tag">Residency</span>
+      <h3>All, locals, or visitors</h3>
+      <p>Devices are classed by their common evening location. <b>Surfaces</b> whether
+        locals and visitors use different routes, and whether visitor trips run longer
+        (see the time-to-stadium chart).</p>
+    </div>
+    <div class="method-card">
+      <span class="tag">On the map: direction · trip mode · extras</span>
+      <h3>Direction, mode, and display options</h3>
+      <ul>
+        <li><b>Both / To stadium / Leaving</b> — compare arrival and departure routes; the
+          animation shows inbound (amber) vs. outbound (red).</li>
+        <li><b>All / Walking / Biking / Car</b> — isolate walkers from drivers and cyclists.
+          Mode is inferred from speed between pings, so treat it as indicative.</li>
+        <li><b>Top 20 busiest streets</b> and <b>share of trips</b> — rank streets, or show
+          each street as a percentage of the selected trips instead of a raw count.</li>
+        <li><b>Pause flow</b> and <b>Fullscreen</b> — display controls.</li>
+      </ul>
+    </div>
+    <div class="method-card">
+      <span class="tag">Charts and comparison (right panel)</span>
+      <h3>Numbers behind the map</h3>
+      <p>Estimated people per lot and attendance by lot, local vs. visitor split, time to
+        the stadium (5 or 10 minute bins), trips by time of day, and the busiest entry,
+        exit and top-20 points all update with your filters. <b>Compare against another
+        event</b> overlays another game's time-to-stadium curve from its saved data file.</p>
+    </div>
+  </div>
+  <p class="chart-note">Scroll the guided steps on the left to see the maps change on their
+    own; the first time you touch a filter, the tour stops driving the map so your selection stays.</p>
+</section>
+
+
 <section class="experience">
   <div class="narrative-rail" id="narrative-rail">
 
@@ -582,82 +655,89 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
   <h2>Two analyses, two different questions</h2>
   <p class="lede">This page answers two separate questions with two separate
     sets of devices. Mixing them up is the easiest way to misread the maps,
-    so they are kept apart on purpose.</p>
+    so they are kept apart on purpose — and then brought back together to
+    support the street designations.</p>
 
   <div class="method-grid">
     <div class="method-card">
       <span class="tag">Maps 1–2 · Volume, Local vs. Visitor</span>
       <h3>The walk in from parking</h3>
-      <p><b>Question:</b> which streets do people use to get from a parking
-        lot to the stadium, and how long does it take?</p>
+      <p><b>Question:</b> which streets do people actually use to get from a
+        parking lot to the stadium, and how long does it take?</p>
       <p><b>Population:</b> only devices seen in a mapped parking lot and then
-        at the stadium. Because it is anchored to stadium visits, it mostly
-        reflects <b>event days</b> and pedestrians.</p>
+        at the stadium. Anchored to stadium visits, it mostly reflects
+        <b>event days</b> and walkers. These are the <b>preferred walking
+        routes</b> that back up every pedestrian-street designation.</p>
     </div>
     <div class="method-card">
       <span class="tag">Maps 3–4 · Street Type</span>
-      <h3>How the district's streets are used</h3>
-      <p><b>Question:</b> which streets are vehicle gateways, which are
-        pedestrian corridors, and which are local access streets?</p>
+      <h3>The role each street plays in the district</h3>
+      <p><b>Question:</b> which streets should be designed as gateways, which
+        as pedestrian streets, and which as local streets?</p>
       <p><b>Population:</b> every device seen near <i>any</i> building in the
-        district over the whole data period (a broader extract that includes
-        ordinary, non-event days), so vehicle traffic is not drowned out by
-        event-day crowds.</p>
+        district over the whole data period, including ordinary non-event
+        days, so vehicle traffic is not drowned out by event-day crowds.</p>
     </div>
   </div>
 
   <details open>
-    <summary>Why two populations? (the skew we found)</summary>
-    <p>The first street typing used only stadium-anchored trips and labeled
-      almost every street a pedestrian corridor, even major roads like Dean
-      Martin Drive and Tropicana Avenue. We checked the data: event dates were
-      about 42% of device-days in that extract, with roughly 5× the activity
-      of other days. A broader district-wide extract cut event dates to about
-      10% of device-days, and the major arterials then came out as gateways.</p>
-  </details>
-
-  <details>
-    <summary>How streets are typed</summary>
+    <summary>The three street roles (and the design intent behind them)</summary>
     <ul>
-      <li><b>Gateway</b> — a major road (OpenStreetMap primary / secondary /
-        tertiary) where vehicle travel dominates.</li>
-      <li><b>Pedestrian corridor</b> — a non-gateway street where, on ordinary
-        (non-event) days, at least half of classified observations look like
-        walking or standing, with enough data to trust it.</li>
-      <li><b>Event-day pedestrian corridor</b> — pedestrian share jumps at
-        least 10 points on event days compared with ordinary days <i>from the
-        same months</i>, and reaches at least 50%.</li>
-      <li><b>Local street</b> — everything else with enough data. Streets with
-        too little routine data are shown grey as <b>insufficient data</b>.</li>
-      <li>Parking-lot aisles, driveways and footways are left out; only
-        real public streets are typed.</li>
+      <li><b>Gateway</b> — an arterial (OpenStreetMap motorway / trunk / primary /
+        secondary). Designed to move people and vehicles into and out of the district.</li>
+      <li><b>Pedestrian street</b> — a non-arterial with <i>heavy pedestrian use</i>:
+        it carries at least 5% of all walking lot-to-stadium trips (the Volume map)
+        <i>and</i> has at least 300 walking or standing observations on ordinary
+        days in the district-wide data. These are the streets to design with wider
+        sidewalks and pedestrian amenities. A street can carry heavy car traffic and
+        still qualify — what counts is how many people walk it.</li>
+      <li><b>Local street</b> — everything else. Minimal treatment; streets with thin
+        data are drawn dashed (low confidence).</li>
+      <li>An arterial that is also a major walk-in route (West Hacienda Avenue) keeps
+        the gateway role and is noted in its tooltip as a dual-role street.</li>
+      <li>Parking-lot aisles, driveways and footways are left out; only real public
+        streets are typed.</li>
     </ul>
   </details>
 
   <details>
+    <summary>Why two populations? (the skew we found)</summary>
+    <p>Typing streets only from stadium-anchored trips labeled almost every street
+      a pedestrian corridor, even major roads like Dean Martin Drive and Tropicana
+      Avenue. We checked: event dates were about 42% of device-days in that extract
+      with roughly 5× the activity of other days. A broader district-wide extract cut
+      event dates to about 10% of device-days, and the major arterials then read
+      as vehicle roads.</p>
+  </details>
+
+  <details>
     <summary>How event days are handled (without letting them skew the result)</summary>
-    <p>Each street's label comes from <b>non-event days only</b>, so a crowded
-      game day cannot turn a road into a "pedestrian street." Event days are
-      reported separately as a flag. The event comparison uses ordinary days
-      from the <b>same months</b>, because GPS ping frequency varies a lot by
-      month (median gap of about 3 seconds in early 2025 versus about 40
-      seconds in summer 2025), which would otherwise look like an event effect.</p>
+    <p>The district-wide data supplies each street's <b>ordinary-day</b> pedestrian
+      volume; event days cannot create a role on their own. Event-day behavior is
+      reported separately as an amber <b>event-day surge</b> flag — a rise of at least
+      10 points in pedestrian share compared with ordinary days <b>from the same
+      months</b>. (GPS ping frequency varies a lot by month, median gap about 3
+      seconds in early 2025 versus about 40 seconds in summer 2025, which would
+      otherwise look like an event effect.)</p>
   </details>
 
   <details>
     <summary>Limits to keep in mind</summary>
     <ul>
-      <li>Travel mode is inferred from speed between GPS pings, which is
-        imprecise when pings are sparse. Slow or stop-and-go cars near the
-        Strip can look like bikes; for street typing we count "biking" as
-        vehicle traffic.</li>
-      <li>The shares are <b>relative rankings</b>, not measured pedestrian
-        counts. Even the busiest arterials read only about 60–65% vehicle.</li>
-      <li>Streets with few observations are marked insufficient data or low
-        confidence rather than forced into a category.</li>
-      <li>Census commute-mode data for the district's block group (about 623
-        workers) was reviewed as a plausibility check only; it describes
-        residents, not people who work in the district.</li>
+      <li>Travel mode is inferred from speed between GPS pings, which is imprecise
+        when pings are sparse. Slow or stop-and-go cars near the Strip can look like
+        bikes, so for street typing "biking" is counted as vehicle traffic.</li>
+      <li>Pedestrian observations are relative signals from speed, not counted
+        pedestrians. Pedestrian streets are supported by the walk-in routes precisely
+        because those are measured from lot-to-stadium trips.</li>
+      <li>The walk-in routes come from stadium trips, so a street away from the
+        stadium path will not qualify as a pedestrian street here even if people
+        walk it.</li>
+      <li>The thresholds (5% of walking trips, 300 observations) are judgment calls
+        and are adjustable in the code.</li>
+      <li>Census commute-mode data for the district's block group (about 623 workers)
+        was reviewed as a plausibility check only; it describes residents, not people
+        who work in the district.</li>
     </ul>
   </details>
   <p class="chart-note">Full methodology, thresholds and code are in the repository README.</p>
@@ -1076,12 +1156,12 @@ const STREET_TYPE_COLORS = {
   insufficient_data: '#6b7280',
 };
 const STREET_TYPE_LABELS = {
-  gateway: 'Gateway (major road, vehicle-dominant)',
-  pedestrian_corridor: 'Pedestrian corridor (routine)',
-  event_pedestrian_corridor: 'Event-day pedestrian corridor',
-  local_street: 'Local street (vehicle-dominant)',
+  gateway: 'Gateway (arterial)',
+  pedestrian_corridor: 'Pedestrian street (heavy walking use)',
+  event_pedestrian_corridor: 'Event-day pedestrian surge',
+  local_street: 'Local street',
   unclassified: 'Unclassified (no mode data)',
-  insufficient_data: 'Insufficient data',
+  insufficient_data: 'Local street (thin data)',
 };
 const MODE_EXPLAINERS = {
   volume: ['Volume — the walk in from parking',
@@ -1089,9 +1169,9 @@ const MODE_EXPLAINERS = {
   residency: ['Local vs. Visitor — who uses which route',
     'Same stadium-anchored trips as Volume, colored by whether the device\'s common evening location is in the Las Vegas metro (local) or elsewhere (visitor). Event-day population, walk-in routes only.'],
   street_type_vehicle: ['Street Type: Vehicle — gateways and local streets',
-    'Built from a broader district-wide extract (all devices near any district building, all days), <b>not</b> just stadium trips. Gateways are major roads where vehicle travel dominates; local streets are the rest. Labels use ordinary (non-event) days only; "biking" is counted as vehicle traffic because slow cars near the Strip read as bikes. Grey = too little data.'],
-  street_type_pedestrian: ['Street Type: Pedestrian — routine vs. event-day corridors',
-    'Same district-wide extract. Teal streets are pedestrian-heavy on ordinary days. Amber streets (and gateways flagged amber) jump at least 10 points toward walking on event days versus ordinary days <b>from the same months</b>. Shares are relative rankings from speed between GPS pings, not counted pedestrians.'],
+    'Gateways are arterials (OpenStreetMap primary / secondary / trunk) that carry people and vehicles into and out of the district; every other street that is not a pedestrian street is local. Role assignment uses a broader district-wide extract (all devices near any district building, all days), <b>not</b> just stadium trips. Dashed = thin data.'],
+  street_type_pedestrian: ['Street Type: Pedestrian — streets with heavy walking use',
+    'Teal streets are non-arterials that carry at least 5% of walking lot-to-stadium trips (see the Volume map) <b>and</b> have at least 300 walking/standing observations on ordinary days. Amber marks an event-day surge: at least 10 points more pedestrian than ordinary days <b>from the same months</b>. Observations come from speed between GPS pings, so read them as relative signals, not counted pedestrians.'],
 };
 function updateModeExplainer(){
   const el = document.getElementById('mode-explainer');
@@ -1224,8 +1304,8 @@ const STREET_TYPE_SUBTYPES = {
   // mode data at all is far more often a quiet street a car drove past
   // too briefly to resolve than a pedestrian-only path, and leaving it out
   // of both exhibits would silently drop real streets from the map.
-  street_type_vehicle: ['gateway', 'local_street', 'unclassified', 'insufficient_data'],
-  street_type_pedestrian: ['pedestrian_corridor', 'event_pedestrian_corridor'],
+  street_type_vehicle: ['gateway', 'local_street', 'unclassified'],
+  street_type_pedestrian: ['pedestrian_corridor'],
 };
 
 function renderStreetTypeSegments(mode){
@@ -1259,13 +1339,15 @@ function renderStreetTypeSegments(mode){
     if(!showsCorridor(cls)) return;
 
     const path = geometries[key];
-    const eventOverlay = mode === 'street_type_pedestrian' && cls.event_pedestrian_flag && cls.type === 'gateway';
+    const eventOverlay = mode === 'street_type_pedestrian' && cls.event_pedestrian_flag && cls.type !== 'pedestrian_corridor';
     const color = eventOverlay ? STREET_TYPE_COLORS.event_pedestrian_corridor
                                : (STREET_TYPE_COLORS[cls.type] || STREET_TYPE_COLORS.unclassified);
     const lowConfidence = cls.type_confidence === 'low' || cls.type === 'insufficient_data';
     const pct = (v)=> (v === null || v === undefined) ? '–' : Math.round(v*100) + '%';
     const eventLine = (cls.baseline_ped_share !== undefined)
-      ? `Pedestrian share — ordinary days: ${pct(cls.baseline_ped_share)} (${cls.baseline_votes||0} obs.) &nbsp;·&nbsp; event days: ${pct(cls.event_ped_share)} (${cls.event_votes||0} obs.)`+
+      ? (cls.walkin_share !== null && cls.walkin_share !== undefined
+          ? `Walk-in routes (Volume map): ${cls.walkin_trips||0} walking trip${cls.walkin_trips===1?'':'s'} = ${(cls.walkin_share*100).toFixed(1)}% of walking lot-to-stadium trips${cls.also_walkin_route ? ' <b>(arterial that is also a major walk-in route)</b>' : ''}<br>` : '')+
+        `Ordinary-day pedestrian observations: ${cls.ped_obs_ordinary||0} (${pct(cls.baseline_ped_share)} of ${cls.baseline_votes||0}) &nbsp;·&nbsp; event days: ${pct(cls.event_ped_share)} (${cls.event_votes||0} obs.)`+
         (cls.event_shift !== null && cls.event_shift !== undefined
           ? `<br>Event-day shift vs. same-month ordinary days: ${cls.event_shift>=0?'+':''}${(cls.event_shift*100).toFixed(1)} pts${cls.event_pedestrian_flag ? ' <b style="color:#ffb648">(event-day pedestrian surge)</b>' : ''}<br>` : '<br>')
       : '';
@@ -1322,16 +1404,16 @@ function updateColorLegend(maxTotal, streetTypeMode){
     ramp.style.display = 'none';
     minmaxRow.style.display = 'none';
     label.textContent = isVehicle
-      ? 'Vehicle streets (typed from ordinary days)'
-      : 'Pedestrian corridors (routine vs. event-day)';
+      ? 'Vehicle streets (gateways vs. local)'
+      : 'Pedestrian streets (heavy walking use)';
     categorical.classList.add('visible');
     categorical.innerHTML = types.map(t=>
       `<div class="row"><i class="sw" style="background:${STREET_TYPE_COLORS[t]}"></i>${STREET_TYPE_LABELS[t]}</div>`
     ).join('') +
     `<div class="row"><i class="sw dashed" style="color:${STREET_TYPE_COLORS.gateway}"></i>Low confidence (small sample / tie)</div>` +
     `<div class="note">${isVehicle
-      ? 'Vehicle streets: gateways (major roads) vs. local streets, typed from ordinary (non-event) days. Parking-lot aisles, driveways, and footways are excluded. Built from all devices near any district building, not just stadium trips — see "Method" below the map.'
-      : 'Pedestrian corridors on their own scale. Teal = pedestrian-heavy on ordinary days; amber = a clear jump toward walking on event days (also drawn over gateways that show it). Relative rankings from speed between pings, not counted pedestrians.'
+      ? 'Vehicle streets: gateways (arterials) vs. local streets. Parking-lot aisles, driveways, and footways are excluded. Roles use all devices near any district building, not just stadium trips — see "Method" below the map.'
+      : 'Pedestrian streets: non-arterials with heavy walking use, supported by the walk-in routes on the Volume map. Amber = event-day surge (also drawn over any street that shows it). Relative signals from speed between pings, not counted pedestrians.'
     }</div>`;
     return;
   }

@@ -101,6 +101,19 @@ def parse_args(argv=None) -> argparse.Namespace:
                         "exceeds its routine share by at least this. Default 0.10.")
     p.add_argument("--min-event-votes", type=int, default=100,
                    help="Minimum event-day votes to judge the event shift. Default 100.")
+    p.add_argument("--walkin-routes", default=None,
+                   help="routes.json from the stadium-anchored (lot-to-stadium) run. With "
+                        "--walkin-edge-corridors, supplies the walk-in route volumes that a "
+                        "pedestrian street must be supported by. Optional but needed for "
+                        "pedestrian-street designation.")
+    p.add_argument("--walkin-edge-corridors", default=None,
+                   help="edge_corridors.json from the same stadium-anchored run as --walkin-routes.")
+    p.add_argument("--min-walkin-share", type=float, default=0.05,
+                   help="Pedestrian street must carry at least this share of all WALKING "
+                        "lot-to-stadium trips. Default 0.05.")
+    p.add_argument("--min-ped-observations", type=int, default=300,
+                   help="...and have at least this many walking/stationary observations on "
+                        "ordinary days in the district-wide data. Default 300.")
     p.add_argument("--min-leg-pings", type=int, default=4,
                     help="Drop legs with fewer than this many pings before mode classification. "
                          "A 2-ping leg has exactly one speed segment, so its 'mode' is a single "
@@ -348,6 +361,18 @@ def main(argv=None):
         ped_share_threshold=args.ped_share_threshold, min_baseline_votes=args.min_baseline_votes,
         event_shift_threshold=args.event_shift_threshold, min_event_votes=args.min_event_votes,
     )
+    if args.walkin_routes and args.walkin_edge_corridors:
+        _routes = json.load(open(args.walkin_routes))
+        _ec = json.load(open(args.walkin_edge_corridors))
+        _wc, _wt = pp.compute_walkin_corridor_counts(_routes, _ec)
+        refined = pp.assign_street_roles(street_classification, refined, _wc, _wt,
+                                         min_walkin_share=args.min_walkin_share,
+                                         min_ped_observations=args.min_ped_observations,
+                                         min_baseline_votes=args.min_baseline_votes)
+        log.info("Street roles assigned from arterial class + walk-in route volume (%d walking lot trips).", _wt)
+    else:
+        log.warning("No --walkin-routes/--walkin-edge-corridors: pedestrian streets are NOT assigned by "
+                    "walk-in route volume (falling back to the ordinary-day pedestrian-share rule).")
     (out_dir / "street_classification_refined.json").write_text(json.dumps(refined, indent=1))
     refined_counts = Counter(v["refined_type"] for v in refined.values())
     log.info("Refined street types (gateways kept; others from routine baseline, event days flagged): %s. "

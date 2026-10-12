@@ -33,10 +33,11 @@ for corridor, r in refined.items():
         continue
     c["base_type"] = c["type"]
     c["type"] = r["refined_type"]
-    if r["refined_type"] == "insufficient_data":
+    if r.get("low_data") or r["refined_type"] == "insufficient_data":
         c["type_confidence"] = "low"
     for k in ("baseline_ped_share", "baseline_votes", "event_ped_share", "event_votes",
-              "month_matched_baseline_ped_share", "event_shift", "event_pedestrian_flag"):
+              "month_matched_baseline_ped_share", "event_shift", "event_pedestrian_flag",
+              "ped_obs_ordinary", "walkin_trips", "walkin_share", "also_walkin_route"):
         c[k] = r.get(k)
 
 subs = {
