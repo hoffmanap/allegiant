@@ -34,7 +34,7 @@ when explaining the work.
 | Data | Pathing X export anchored to the stadium, plus Pin and Visitors Home reports | Pathing X export `10178831_Clark_pathing_x_report.tsv.gz` (640 dates, 902,880 device-days) |
 | Time bias | Mostly **event days** (event dates were 42.4% of device-days, about 5x the activity of other days) | Event dates are about 10.5% of device-days; includes ordinary days |
 | Code | `pathing_pipeline.py` | `district_wide_street_analysis.py` |
-| Dashboard maps | Volume; Local vs. Visitor | Street Type: Vehicle; Street Type: Pedestrian |
+| Dashboard maps | Volume; Local vs. Visitor | Street Roles (one consolidated map) |
 | Good for | Event-day walk-in routes, lot attribution, attendance estimates, local vs. visitor | Day-to-day street roles; event-day change in pedestrian use |
 | Not good for | Judging how streets are used on ordinary days (it over-represents pedestrians) | Counting people or lot-level questions |
 
@@ -760,25 +760,13 @@ dashboard can load in its comparison picker.
   inbound or outbound traffic for the current filter. Without street-match
   data, the map falls back to straight-line GPS-interpolated routes
   automatically, with a banner explaining why.
-- **Street Type: Vehicle / Street Type: Pedestrian** (two separate options
-  in the map-mode toggle, after Volume / Local vs. Visitor): colors each
-  real public street by its classification from `street_classification.json`
-  — gateway (red-orange), pedestrian corridor (teal), or local street
-  (violet) — per §8b/§8c. These are two deliberately separate exhibits, not
-  one shared view: vehicle-street trip counts run far higher than
-  pedestrian-corridor counts, so a shared volume/line-weight scale would
-  make the pedestrian corridors invisible. Each exhibit scales its own line
-  weight only against the busiest corridor *within that exhibit*. Parking-
-  lot aisles, driveways, and footways aren't drawn in either mode (they're
-  excluded from the classification entirely, not just hidden). A corridor
-  whose type rests on too little evidence (fewer than 5 trip-votes, or a
-  tie between two modes) is drawn dashed and dimmer rather than with the
-  same solid confidence as a well-sampled street — hover any segment for
-  its dominant mode, vote count, and confidence. Both exhibits are built
-  from the broader district-wide trip population (§8c), not the lot-
-  qualified population the mode filter/top-20 highlight/share-of-trips
-  toggle operate on, so those three controls hide automatically while
-  either Street Type exhibit is active.
+- **Street Roles** (third option in the map-view toggle): one consolidated
+  map that colors every real public street by its role from
+  `street_classification.json` — gateway (blue), pedestrian street (pink),
+  local street (grey) — per §8b/§8c. Line weight is scaled within each role
+  so busy gateways do not wash out the smaller pedestrian streets. A yellow
+  halo marks an event-day surge. Clicking a legend row isolates one role, and
+  the narrative steps use the same focus.
 - **Busiest entry points**: a ranked bar chart of the street segments where
   inbound trips first enter the mapped network — click a bar to fly the map
   to that segment. Requires street-match data.
@@ -795,8 +783,8 @@ dashboard can load in its comparison picker.
 ### Reading each map (also summarized on the dashboard)
 
 - **Volume / Local vs. Visitor:** stadium-anchored walk-in trips, mostly event days.
-- **Street Type: Vehicle / Pedestrian:** gateways are arterials; pedestrian streets are non-arterials with heavy walking use backed by the walk-in routes (Volume map); amber marks an event-day pedestrian surge measured against same-month ordinary days.
-- The page opens with a "How to use this page" guide describing every filter, what it does and what it helps surface; the Street Type maps do not respond to the lot / date / residency filters.
+- **Street Roles:** one map. Gateways are arterials; pedestrian streets are non-arterials with heavy walking use backed by the walk-in routes (Volume map); local streets are the rest. A yellow halo marks an event-day pedestrian surge measured against same-month ordinary days.
+- The page opens with an introduction (what the tool is, the three street roles) and a controls card describing every filter. The narrative sits beside a sticky map and drives it as you scroll; touching any control pauses the tour until "Resume tour" is clicked. The filters live in a drawer under the map, the charts sit in a full-width section below, and Street Roles does not respond to the lot / date / residency filters. The theme is light with yellow highlighter marks.
 - The dashboard shows a short explainer under the map that changes with the selected map, and a "Method" section above the footer covering the two populations, why we use two, how streets are typed, how event days are handled, and the limits.
 
 ## 12. Known limitations

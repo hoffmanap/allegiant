@@ -4,577 +4,414 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Walk In — Routes to Allegiant Stadium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-
-/* ---------------------------------------------------------------- */
-/* TOKENS                                                            */
-/* ---------------------------------------------------------------- */
+/* ================================================================ */
+/* TOKENS — light "highlighter" theme                                */
+/* ================================================================ */
 :root{
-  --field-black:#0c0d10;
-  --night-navy:#12151c;
-  --panel:#181b23;
-  --line:#2a2e38;
-  --paper:#f1ede4;
-  --silver:#c9cdd6;
-  --allegiant-red:#a6192e;
-  --torch-amber:#ffb648;
-  --local-teal:#3ec9a7;
-  --visitor-violet:#b98cf2;
-  --muted:#7d8394;
-  --display: "Oswald", "Arial Narrow", sans-serif;
-  --body: "Source Serif 4", Georgia, serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
-}
+  --bg:#fffdf6;
+  --bg-2:#f6f2e4;
+  --ink:#17160f;
+  --ink-2:#44413a;
+  --muted:#6f6a5c;
+  --line:#e0d9c3;
+  --panel:#ffffff;
+  --hi:#ffe94a;          /* highlighter yellow */
+  --hi-soft:#fff6a8;
+  --hi-pink:#ffb3d1;
+  --hi-blue:#b9d4ff;
+  --hi-green:#b7f0d5;
 
+  --gateway:#2b4fb3;     /* street roles */
+  --pedestrian:#e0267a;
+  --local:#8b8c94;
+  --surge:#ffd400;
+
+  --to-stadium:#f2a900;
+  --from-stadium:#a6192e;
+  --local-res:#13a389;
+  --visitor-res:#7a5cd6;
+
+  /* aliases used by inline styles generated in script */
+  --paper:var(--ink); --silver:var(--ink-2); --field-black:var(--ink);
+  --torch-amber:var(--hi); --allegiant-red:var(--from-stadium);
+  --local-teal:var(--local-res); --visitor-violet:var(--visitor-res);
+  --night-navy:var(--bg-2);
+
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
 *{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
 html,body{margin:0;padding:0;}
-body{
-  background:var(--field-black);
-  color:var(--paper);
-  font-family:var(--body);
-  line-height:1.6;
-}
-::selection{background:var(--allegiant-red);color:#fff;}
-a{color:var(--torch-amber);}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:1.06rem;line-height:1.65;}
+::selection{background:var(--hi);color:var(--ink);}
+a{color:var(--ink);text-decoration-color:var(--hi);text-decoration-thickness:.18em;text-underline-offset:.12em;}
+a:hover{background:var(--hi);}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-2);padding:.08em .35em;border-radius:3px;}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem;}
 
-/* ---------------------------------------------------------------- */
-/* MASTHEAD                                                          */
-/* ---------------------------------------------------------------- */
-.masthead{
-  padding:6vh 6vw 5vh;
-  max-width:1000px;
-  border-bottom:1px solid var(--line);
-}
-.kicker{
-  font-family:var(--mono);
-  text-transform:uppercase;
-  letter-spacing:.18em;
-  font-size:.72rem;
-  color:var(--torch-amber);
-  margin:0 0 1.2rem;
-}
-.kicker::before{content:"● ";color:var(--allegiant-red);}
-h1.title{
-  font-family:var(--display);
-  font-weight:600;
-  text-transform:uppercase;
-  font-size:clamp(2.2rem,6vw,4.4rem);
-  line-height:.96;
-  margin:0 0 1.2rem;
-}
-h1.title em{font-style:normal;color:var(--allegiant-red);}
-.dek{font-size:1.12rem;max-width:640px;color:var(--silver);margin:0;}
-.dek b{color:var(--paper);font-weight:600;}
-.byline{
-  font-family:var(--mono);
-  font-size:.76rem;
-  color:var(--muted);
-  margin-top:1.6rem;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-}
+/* highlighter marks */
+.mark{background:linear-gradient(transparent 52%,var(--hi) 52%,var(--hi) 92%,transparent 92%);padding:0 .12em;font-weight:600;color:var(--ink);box-decoration-break:clone;-webkit-box-decoration-break:clone;}
+.mark.pink{background:linear-gradient(transparent 52%,var(--hi-pink) 52%,var(--hi-pink) 92%,transparent 92%);}
+.mark.blue{background:linear-gradient(transparent 52%,var(--hi-blue) 52%,var(--hi-blue) 92%,transparent 92%);}
+.mark.green{background:linear-gradient(transparent 52%,var(--hi-green) 52%,var(--hi-green) 92%,transparent 92%);}
+.mark.grey{background:linear-gradient(transparent 52%,#dcdce0 52%,#dcdce0 92%,transparent 92%);}
 
-/* ---------------------------------------------------------------- */
-/* MAIN EXPERIENCE: narrative rail (scrolls) + persistent map+panel  */
-/* (sticky) -- map, filters, and charts share one frame the whole    */
-/* time, so nothing resets when you scroll.                          */
-/* ---------------------------------------------------------------- */
-.experience{
-  display:grid;
-  grid-template-columns:minmax(320px,40%) 1fr;
-  align-items:start;
-}
-.narrative-rail{
-  padding:5vh 4vw 10vh;
-  border-right:1px solid var(--line);
-}
-.step{
-  max-width:520px;
-  padding:2.2rem 0;
-  border-bottom:1px dashed var(--line);
-  opacity:.45;
-  transition:opacity .35s ease;
-}
-.step:last-child{border-bottom:none;}
+/* ================================================================ */
+/* MASTHEAD + INTRO                                                  */
+/* ================================================================ */
+.masthead{max-width:1100px;margin:0 auto;padding:7vh 6vw 3vh;}
+.kicker{font-family:var(--mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 1.2rem;}
+h1.title{font-family:var(--display);font-weight:800;font-size:clamp(2.6rem,7.5vw,5.4rem);line-height:.98;letter-spacing:-.02em;margin:0 0 1.2rem;}
+.dek{font-size:1.28rem;line-height:1.5;max-width:44ch;color:var(--ink-2);margin:0;}
+.byline{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:1.6rem;letter-spacing:.06em;text-transform:uppercase;}
+
+.intro{max-width:1100px;margin:0 auto;padding:2vh 6vw 6vh;display:grid;grid-template-columns:1.15fr 1fr;gap:3rem;}
+.intro h2{font-family:var(--display);font-weight:800;font-size:1.5rem;line-height:1.2;margin:0 0 .8rem;letter-spacing:-.01em;}
+.intro p{margin:0 0 1rem;}
+.intro .roles{display:grid;gap:.55rem;margin:1.1rem 0 0;padding:0;list-style:none;}
+.intro .roles li{display:grid;grid-template-columns:1.1rem 1fr;gap:.7rem;align-items:start;font-size:1rem;line-height:1.5;}
+.intro .roles i{display:block;height:.28rem;margin-top:.62rem;border-radius:2px;}
+.controls-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.2rem 1.3rem;font-size:.93rem;line-height:1.5;align-self:start;box-shadow:4px 4px 0 var(--hi);}
+.controls-card h3{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .7rem;font-weight:500;}
+.controls-card dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:.55rem .9rem;}
+.controls-card dt{font-family:var(--display);font-weight:700;font-size:.9rem;white-space:nowrap;}
+.controls-card dd{margin:0;color:var(--ink-2);}
+.controls-card .tip{margin:.9rem 0 0;padding-top:.8rem;border-top:1px dashed var(--line);color:var(--muted);font-size:.85rem;}
+
+/* ================================================================ */
+/* STORY: readable narrative on the left, sticky map on the right    */
+/* ================================================================ */
+.story{display:grid;grid-template-columns:minmax(340px,38%) 1fr;align-items:start;border-top:1px solid var(--line);background:var(--bg);}
+.story-text{padding:0 3.2vw 28vh 5vw;}
+.step{padding:16vh 0 4vh;opacity:.38;transition:opacity .3s ease;max-width:34rem;}
+.step:first-child{padding-top:8vh;}
 .step.is-active{opacity:1;}
-.step .eyebrow{
-  font-family:var(--mono);
-  font-size:.7rem;
-  letter-spacing:.14em;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin:0 0 .6rem;
-}
-.step h2{
-  font-family:var(--display);
-  text-transform:uppercase;
-  font-weight:600;
-  font-size:1.4rem;
-  margin:0 0 .9rem;
-}
-.step p{margin:0 0 .9rem;color:var(--silver);font-size:1rem;}
-.hl{
-  padding:.05em .35em;
-  border-radius:3px;
-  font-weight:600;
-  color:var(--field-black);
-  cursor:pointer;
-}
-.step.is-active .hl{box-shadow:0 0 0 2px var(--field-black), 0 0 0 3px currentColor;}
+.step h2{font-family:var(--display);font-weight:800;font-size:clamp(1.55rem,2.3vw,2.1rem);line-height:1.12;letter-spacing:-.015em;margin:0 0 1rem;}
+.step p{margin:0 0 1rem;}
+.step .small{font-size:.92rem;color:var(--muted);}
+.step ul{margin:0 0 1rem 1.1rem;padding:0;}
+.step li{margin:.35rem 0;}
+.step .eyebrow{color:var(--muted);}
+.role-chip{display:inline-block;font-family:var(--display);font-weight:700;font-size:.92em;padding:0 .35em;border-radius:3px;color:#fff;line-height:1.5;}
+.role-chip.gateway{background:var(--gateway);} .role-chip.pedestrian{background:var(--pedestrian);} .role-chip.local{background:var(--local);}
+.callout{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--hi);border-radius:6px;padding:.8rem 1rem;font-size:.95rem;margin:1.1rem 0;}
+.callout b{font-family:var(--display);}
+.lot-link,.res-link{cursor:pointer;}
+.step-cta{font-family:var(--mono);font-size:.78rem;background:var(--ink);color:var(--bg);border:none;border-radius:6px;padding:.55rem .9rem;cursor:pointer;margin-top:.4rem;}
+.step-cta:hover{background:#000;box-shadow:3px 3px 0 var(--hi);}
 
-.override-note{
-  font-family:var(--mono);
-  font-size:.72rem;
-  color:var(--torch-amber);
-  background:rgba(255,182,72,.08);
-  border:1px solid rgba(255,182,72,.3);
-  border-radius:6px;
-  padding:.6rem .8rem;
-  margin:1.4rem 0 0;
-  display:none;
-}
-.override-note.visible{display:block;}
+.story-map{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg-2);border-left:1px solid var(--line);}
+.story-map:fullscreen{width:100vw;height:100vh;}
+.map-head{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;padding:.65rem .8rem;background:var(--bg);border-bottom:1px solid var(--line);}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;background:var(--panel);}
+.seg button{font-family:var(--display);font-weight:700;font-size:.8rem;background:none;border:none;color:var(--ink);padding:.42rem .8rem;cursor:pointer;border-right:1px solid var(--ink);}
+.seg button:last-child{border-right:none;}
+.seg button:hover{background:var(--hi-soft);}
+.seg button.active{background:var(--ink);color:var(--bg);}
+.seg.small button{font-size:.72rem;padding:.3rem .55rem;}
+.walkin-controls{display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;width:100%;}
+.pill-btn{font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:.34rem .6rem;border-radius:99px;cursor:pointer;}
+.pill-btn:hover{border-color:var(--ink);}
+.pill-btn.active{background:var(--hi);border-color:var(--ink);}
+.tour-pill{margin-left:auto;}
+.tour-pill.paused{background:var(--hi);border-color:var(--ink);font-weight:600;}
 
-/* Sticky right column: everything lives here, always in frame */
-.side-panel{
-  position:sticky;
-  top:0;
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  background:var(--night-navy);
-  border-left:1px solid var(--line);
-}
-.map-zone{
-  position:relative;
-  flex:0 0 52%;
-  min-height:280px;
-  border-bottom:1px solid var(--line);
-}
-.map-zone:fullscreen{
-  flex-basis:100vh;
-  width:100vw;
-  height:100vh;
-  background:var(--night-navy);
-}
-#map{position:absolute;inset:0;}
-/* Recreates a dark basemap look from plain (bright, no-key-needed)
-   OpenStreetMap tiles -- scoped to just the tile pane so route polylines,
-   markers, and popups (a separate Leaflet pane) are completely unaffected. */
-.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.9);}
-.legend{
-  position:absolute;
-  bottom:.8rem;
-  left:.8rem;
-  z-index:500;
-  background:rgba(12,13,16,.88);
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:.6rem .8rem;
-  font-family:var(--mono);
-  font-size:.68rem;
-  color:var(--silver);
-  display:flex;
-  gap:.9rem;
-}
-.legend span{display:flex;align-items:center;gap:.35rem;}
-.swatch{width:12px;height:3px;border-radius:2px;display:inline-block;}
+.map-zone{position:relative;flex:1 1 auto;min-height:260px;}
+#map{position:absolute;inset:0;background:#e9e6da;}
+.leaflet-tooltip{font-family:var(--body);font-size:.85rem;line-height:1.4;color:var(--ink);background:var(--panel);border:1px solid var(--ink);border-radius:6px;box-shadow:3px 3px 0 var(--hi);}
+.fs-btn{position:absolute;top:.6rem;right:.6rem;z-index:500;}
+.street-match-note{position:absolute;top:.8rem;left:3.4rem;z-index:500;background:var(--ink);border-radius:8px;padding:.6rem .8rem;font-family:var(--mono);font-size:.68rem;color:#fff;max-width:260px;display:none;}
+.street-match-note.visible{display:block;}
 
-/* animated directional flow on street-segment polylines (SVG dash animation) */
 .flow-to-stadium{stroke-dasharray:7,5;animation:flow-fwd 4s linear infinite;}
 .flow-from-stadium{stroke-dasharray:7,5;animation:flow-rev 4s linear infinite;}
 @keyframes flow-fwd{to{stroke-dashoffset:-24;}}
 @keyframes flow-rev{to{stroke-dashoffset:24;}}
-.flow-paused .flow-to-stadium, .flow-paused .flow-from-stadium{animation:none;stroke-dasharray:none;}
+.flow-paused .flow-to-stadium,.flow-paused .flow-from-stadium{animation:none;stroke-dasharray:none;}
 
-.map-mode-toggle{
-  position:absolute;
-  top:.8rem;
-  right:.8rem;
-  z-index:500;
-  display:flex;
-  gap:.3rem;
-  background:rgba(12,13,16,.88);
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:.3rem;
-}
-.map-mode-toggle button{
-  font-family:var(--mono);font-size:.66rem;
-  background:none;border:none;color:var(--silver);
-  padding:.35rem .6rem;border-radius:5px;cursor:pointer;
-}
-.map-mode-toggle button.active{background:var(--allegiant-red);color:#fff;}
-
-.map-icon-btn{
-  font-family:var(--mono);font-size:.68rem;
-  background:rgba(12,13,16,.88);
-  border:1px solid var(--line);
-  color:var(--silver);
-  padding:.4rem .7rem;
-  border-radius:6px;
-  cursor:pointer;
-}
-.map-icon-btn.active{border-color:var(--torch-amber);color:var(--torch-amber);}
-.color-legend{
-  position:absolute;
-  bottom:.8rem;
-  right:.8rem;
-  z-index:500;
-  background:rgba(12,13,16,.88);
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:.5rem .7rem;
-  font-family:var(--mono);
-  font-size:.62rem;
-  color:var(--muted);
-}
-.color-legend .ramp{
-  height:8px;width:120px;border-radius:3px;margin:.3rem 0;
-  background:linear-gradient(to right, #3a3f4c, #ffb648, #a6192e);
-}
-.color-legend .ramp.diverge{
-  background:linear-gradient(to right, var(--visitor-violet), #4a4f5c, var(--local-teal));
-}
+.legend-box{position:absolute;left:.6rem;bottom:1.4rem;z-index:500;background:rgba(255,255,255,.95);border:1px solid var(--ink);border-radius:8px;padding:.55rem .75rem;font-family:var(--mono);font-size:.68rem;color:var(--ink-2);max-width:260px;}
+.legend-box .lg-title{font-weight:600;color:var(--ink);margin-bottom:.35rem;}
+.legend-box .ramp{height:9px;width:150px;border-radius:3px;margin:.3rem 0;background:linear-gradient(to right,#d3d0c4,#f2a900,#a6192e);}
+.legend-box .ramp.diverge{background:linear-gradient(to right,var(--visitor-res),#d3d0c4,var(--local-res));}
+.legend-box .minmax{display:flex;justify-content:space-between;}
+.legend-box .flows{display:flex;gap:.8rem;margin-top:.45rem;padding-top:.4rem;border-top:1px dashed var(--line);}
+.legend-box .flows span{display:flex;align-items:center;gap:.3rem;}
+.swatch{width:14px;height:4px;border-radius:2px;display:inline-block;}
 .legend-categorical{display:none;}
 .legend-categorical.visible{display:block;}
-.legend-categorical .row{display:flex;align-items:center;gap:.4rem;margin:.22rem 0;}
-.legend-categorical .sw{width:16px;height:3px;border-radius:2px;flex-shrink:0;}
-.legend-categorical .sw.dashed{
-  background-image:repeating-linear-gradient(to right, currentColor 0 4px, transparent 4px 7px);
-  background-color:transparent !important;
-}
-.legend-categorical .note{margin-top:.35rem;opacity:.75;font-size:.58rem;line-height:1.35;max-width:150px;}
-.street-match-note{
-  position:absolute;
-  top:.8rem;
-  left:.8rem;
-  z-index:500;
-  background:rgba(166,25,46,.92);
-  border-radius:8px;
-  padding:.6rem .8rem;
-  font-family:var(--mono);
-  font-size:.68rem;
-  color:#fff;
-  max-width:260px;
-  display:none;
-}
-.street-match-note.visible{display:block;}
+.legend-categorical .row{display:flex;align-items:center;gap:.5rem;margin:.1rem -.3rem;padding:.22rem .3rem;border-radius:5px;cursor:pointer;}
+.legend-categorical .row:hover{background:var(--hi-soft);}
+.legend-categorical .row.on{background:var(--hi-soft);outline:1px solid var(--ink);}
+.legend-categorical .sw{width:20px;height:5px;border-radius:3px;flex-shrink:0;}
+.legend-categorical .sw.dashed{background-image:repeating-linear-gradient(to right,currentColor 0 4px,transparent 4px 7px);background-color:transparent !important;height:3px;}
+.legend-categorical .sw.halo{background:var(--surge);box-shadow:0 0 0 1px #b39700;}
+.legend-categorical .note{margin-top:.35rem;color:var(--muted);font-size:.62rem;line-height:1.4;cursor:default;}
 
-/* scrollable lower half of the sticky panel: controls + charts */
-.panel-scroll{
-  flex:1 1 auto;
-  overflow-y:auto;
-  padding:1.2rem 1.2rem 2.5rem;
-}
-.panel-scroll h4{
-  font-family:var(--mono);
-  text-transform:uppercase;
-  letter-spacing:.09em;
-  font-size:.7rem;
-  color:var(--torch-amber);
-  margin:1.4rem 0 .7rem;
-}
-.panel-scroll h4:first-child{margin-top:0;}
+.mode-explainer{padding:.55rem .9rem;background:var(--bg);border-top:1px solid var(--line);font-size:.84rem;line-height:1.45;color:var(--ink-2);max-height:6.2rem;overflow:auto;}
+.mode-explainer .me-title{font-family:var(--display);font-weight:800;font-size:.85rem;color:var(--ink);margin-right:.35rem;}
 
-.lot-toggles{display:flex;flex-wrap:wrap;gap:.4rem;}
-.lot-chip{
-  font-family:var(--mono);
-  font-size:.72rem;
-  padding:.35rem .65rem;
-  border-radius:99px;
-  border:1px solid var(--line);
-  background:var(--panel);
-  color:var(--silver);
-  cursor:pointer;
-  user-select:none;
-}
-.lot-chip.active{color:var(--field-black);border-color:transparent;font-weight:700;}
-.lot-chip-row{display:flex;gap:.4rem;margin-bottom:.6rem;}
-.lot-chip-row button{
-  font-family:var(--mono);font-size:.68rem;
-  background:none;border:1px solid var(--line);color:var(--muted);
-  border-radius:5px;padding:.25rem .5rem;cursor:pointer;
-}
-.lot-chip-row button.active{border-color:var(--allegiant-red);color:var(--allegiant-red);background:rgba(166,25,46,.1);}
+/* filters drawer under the map */
+.filters{background:var(--bg);border-top:1px solid var(--ink);}
+.filters > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;font-family:var(--display);font-weight:800;font-size:.9rem;}
+.filters > summary::-webkit-details-marker{display:none;}
+.filters > summary::before{content:"▸";transition:transform .15s;}
+.filters[open] > summary::before{transform:rotate(90deg);}
+.filters .filter-summary{font-family:var(--mono);font-weight:400;font-size:.7rem;color:var(--muted);margin-left:auto;text-align:right;}
+.filters-body{padding:.2rem .9rem 1rem;max-height:42vh;overflow-y:auto;}
+.filters-body h4,.card h3{font-family:var(--mono);font-weight:500;text-transform:uppercase;letter-spacing:.1em;font-size:.68rem;color:var(--muted);margin:1.1rem 0 .5rem;}
+.filters-body h4:first-child{margin-top:.2rem;}
+.chart-note{font-family:var(--mono);font-size:.64rem;color:var(--muted);margin:.35rem 0 .5rem;line-height:1.45;}
+.lot-toggles{display:flex;flex-wrap:wrap;gap:.35rem;}
+.lot-chip{font-family:var(--mono);font-size:.7rem;padding:.3rem .6rem;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer;user-select:none;}
+.lot-chip.active{color:var(--ink);border-color:var(--ink);font-weight:600;}
+.lot-chip-row{display:flex;gap:.4rem;margin-bottom:.5rem;align-items:center;}
+.lot-chip-row button{font-family:var(--mono);font-size:.68rem;background:var(--panel);border:1px solid var(--line);color:var(--ink-2);border-radius:99px;padding:.26rem .6rem;cursor:pointer;}
+.lot-chip-row button:hover{border-color:var(--ink);}
+.lot-chip-row button.active{background:var(--hi);border-color:var(--ink);color:var(--ink);font-weight:600;}
+.lot-chip-row input[type=date]{font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:.28rem;}
+.residency-toggle{display:flex;gap:.4rem;}
+.res-btn{font-family:var(--display);font-weight:700;font-size:.78rem;padding:.4rem .8rem;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;flex:1;}
+.res-btn.active{background:var(--ink);border-color:var(--ink);color:var(--bg);}
 
-.residency-toggle{display:flex;gap:.5rem;}
-.res-btn{
-  font-family:var(--mono);font-size:.72rem;
-  padding:.4rem .8rem;border-radius:6px;
-  border:1px solid var(--line);background:var(--panel);color:var(--silver);
-  cursor:pointer;flex:1;
-}
-.res-btn.active{background:var(--allegiant-red);border-color:var(--allegiant-red);color:#fff;}
+.override-note{font-family:var(--mono);font-size:.72rem;color:var(--ink);background:var(--hi-soft);border:1px solid var(--ink);border-radius:6px;padding:.6rem .8rem;margin:1.2rem 0 0;display:none;}
+.override-note.visible{display:block;}
 
-.hud-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.74rem;color:var(--silver);padding:.25rem 0;}
-.hud-row b{color:var(--paper);}
-
-.chart-wrap{margin-top:.4rem;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.8rem;}
-.chart-wrap canvas{max-height:180px;}
-.chart-note{font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.4rem;}
-
-.bin-toggle{display:flex;gap:.4rem;margin-bottom:.5rem;}
-.bin-toggle button{
-  font-family:var(--mono);font-size:.66rem;
-  background:var(--panel);border:1px solid var(--line);color:var(--silver);
-  border-radius:5px;padding:.25rem .55rem;cursor:pointer;
-}
-.bin-toggle button.active{border-color:var(--torch-amber);color:var(--torch-amber);}
-
-.event-compare{
-  border-top:1px solid var(--line);
-  margin-top:1.4rem;
-  padding-top:1rem;
-}
-.event-compare input[type=file]{
-  font-family:var(--mono);font-size:.66rem;color:var(--muted);
-  width:100%;
-}
+/* ================================================================ */
+/* NUMBERS SECTION                                                    */
+/* ================================================================ */
+.numbers{max-width:1200px;margin:0 auto;padding:9vh 5vw 4vh;}
+.numbers h2,.method h2{font-family:var(--display);font-weight:800;font-size:clamp(1.7rem,3vw,2.4rem);line-height:1.1;letter-spacing:-.015em;margin:0 0 .6rem;}
+.numbers .lede,.method .lede{max-width:62ch;color:var(--ink-2);margin:0 0 1.4rem;}
+.hud{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin:1rem 0 1.6rem;}
+.hud-row{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.1rem;}
+.hud-row span{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.hud-row b{font-family:var(--display);font-weight:800;font-size:1.7rem;line-height:1.1;}
+.chart-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem;}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem 1.1rem;}
+.card.wide{grid-column:1/-1;}
+.card h3{margin:0 0 .3rem;color:var(--ink);font-family:var(--display);font-weight:800;font-size:1.02rem;letter-spacing:-.005em;text-transform:none;}
+.chart-wrap{margin-top:.4rem;}
+.chart-wrap canvas{max-height:340px;}
+.bin-toggle{display:flex;gap:.4rem;margin:.4rem 0;}
+.bin-toggle button{font-family:var(--mono);font-size:.66rem;background:var(--panel);border:1px solid var(--line);color:var(--ink-2);border-radius:99px;padding:.24rem .6rem;cursor:pointer;}
+.bin-toggle button.active{background:var(--hi);border-color:var(--ink);color:var(--ink);}
+.event-compare input[type=file]{font-family:var(--mono);font-size:.68rem;color:var(--muted);width:100%;}
 .event-chip-list{display:flex;flex-direction:column;gap:.3rem;margin-top:.6rem;}
-.event-chip{
-  font-family:var(--mono);font-size:.68rem;color:var(--silver);
-  background:var(--panel);border:1px solid var(--line);border-radius:6px;
-  padding:.4rem .6rem;display:flex;justify-content:space-between;align-items:center;
-}
+.event-chip{font-family:var(--mono);font-size:.68rem;color:var(--ink-2);background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:.4rem .6rem;display:flex;justify-content:space-between;align-items:center;}
 .event-chip .swatch-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:.4rem;}
 
-/* ---------------------------------------------------------------- */
-/* MAP EXPLAINER + METHOD SECTION                                      */
-/* ---------------------------------------------------------------- */
-.mode-explainer{
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  background:var(--night-navy);padding:.7rem 1rem;font-size:.8rem;line-height:1.45;color:var(--silver);
-}
-.mode-explainer b{color:var(--paper);}
-.mode-explainer .me-title{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--torch-amber);display:block;margin-bottom:.2rem;}
-.method{max-width:1000px;margin:0 auto;padding:7vh 6vw 3vh;}
-.method h2{font-family:var(--display);font-size:1.7rem;margin:0 0 .4rem;color:var(--paper);}
-.method .lede{color:var(--silver);max-width:70ch;}
-.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.2rem 0;}
-.method-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.1rem;font-size:.9rem;line-height:1.5;color:var(--silver);}
-.method-card h3{font-family:var(--display);font-size:1.05rem;margin:0 0 .4rem;color:var(--paper);}
-.method-card .tag{font-family:var(--mono);font-size:.65rem;color:var(--torch-amber);letter-spacing:.06em;text-transform:uppercase;}
-.method details{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.7rem 1.1rem;margin:.6rem 0;font-size:.9rem;line-height:1.5;color:var(--silver);}
-.method summary{cursor:pointer;color:var(--paper);font-family:var(--display);font-size:1rem;}
-.method details ul{margin:.5rem 0 .2rem 1.1rem;padding:0;}
-@media (max-width:900px){.method-grid{grid-template-columns:1fr;}}
+/* ================================================================ */
+/* METHOD + FOOTER                                                    */
+/* ================================================================ */
+.method{max-width:1100px;margin:0 auto;padding:8vh 6vw 3vh;}
+.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin:1.2rem 0;}
+.method-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.2rem;font-size:.98rem;line-height:1.55;}
+.method-card h3{font-family:var(--display);font-weight:800;font-size:1.15rem;margin:0 0 .5rem;}
+.method-card .tag{font-family:var(--mono);font-size:.66rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+.method details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8rem 1.2rem;margin:.7rem 0;font-size:.98rem;line-height:1.55;}
+.method summary{cursor:pointer;font-family:var(--display);font-weight:800;font-size:1.05rem;}
+.method details ul{margin:.6rem 0 .2rem 1.1rem;padding:0;}
+.method details li{margin:.35rem 0;}
+footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);font-size:.9rem;border-top:1px solid var(--line);}
 
-/* ---------------------------------------------------------------- */
-/* FOOTNOTE                                                           */
-/* ---------------------------------------------------------------- */
-footer{
-  max-width:900px;
-  margin:0 auto;
-  padding:5vh 6vw 10vh;
-  color:var(--muted);
-  font-size:.85rem;
-  border-top:1px solid var(--line);
+@media (max-width:980px){
+  .intro{grid-template-columns:1fr;gap:1.6rem;}
+  .story{grid-template-columns:1fr;}
+  .story-map{position:sticky;top:0;height:62vh;order:-1;z-index:20;border-left:none;border-bottom:1px solid var(--ink);}
+  .story-text{padding:0 6vw 20vh;}
+  .step{padding:10vh 0 3vh;}
+  .mode-explainer{display:none;}
+  .filters-body{max-height:30vh;}
+  .legend-box{bottom:.5rem;max-width:200px;}
+  .hud{grid-template-columns:repeat(2,1fr);} .chart-grid,.method-grid{grid-template-columns:1fr;}
 }
-footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-family:var(--mono);color:var(--silver);}
 
-@media (max-width: 900px){
-  .experience{grid-template-columns:1fr;}
-  .side-panel{position:relative;height:auto;border-left:none;}
-  .map-zone{flex-basis:60vh;}
-  .panel-scroll{overflow-y:visible;}
-  .narrative-rail{padding:4vh 6vw 4vh;border-right:none;}
-}
+@media (max-height:860px){.legend-categorical .note{display:none;}.legend-box{bottom:1rem;}}
+.story-map:has(.filters[open]) .mode-explainer{display:none;}
+.story-map:has(.filters[open]) .legend-categorical .note{display:none;}
+.story-map:has(.filters[open]) .filters-body{max-height:36vh;}
+@media (max-width:980px){.story-map{height:54vh;}.legend-categorical .note,.legend-box .flows{display:none;}.legend-box{padding:.4rem .55rem;}.walkin-controls{display:none;}}
 </style>
 </head>
 <body>
 
 <header class="masthead">
-  <p class="kicker">Mobility analysis · Las Vegas, NV</p>
-  <h1 class="title">The Walk In<br><em>Routes to Allegiant Stadium</em></h1>
-  <p class="dek">Anonymized device pings trace how fans actually move from
-    event parking to kickoff — and back out again. Filters, map, and charts
-    stay together in one frame the whole way down, so nothing resets while
-    you explore.</p>
-  <div class="intro" style="max-width:62ch;margin:1.2rem 0 0;font-size:1rem;line-height:1.55">
-    <p><strong>What this tool is.</strong> An interactive planning aid for the Allegiant Stadium district in Clark County, NV. It uses anonymized GPS pings to show (1) which routes people take on foot between event parking and the stadium, and (2) what role each street in the district plays, so street design can match how it is used.</p>
-    <p><strong>How streets are typed.</strong> <em>Gateways</em> are arterials that move people into and out of the district. <em>Pedestrian streets</em> are non-arterials that carry a large share of walk-in trips and heavy everyday foot traffic, and are candidates for wider sidewalks and amenities. <em>Local streets</em> are everything else and need only minimal treatment. Event-day surges are shown as a separate flag and never change a street's role.</p>
-    <p><strong>Where to start.</strong> The first maps show the walk-in routes behind the pedestrian designations; the Street Type maps show the resulting roles. The guide below explains each filter.</p>
-  </div>
+  <p class="kicker">Mobility analysis · Allegiant Stadium district · Clark County, NV</p>
+  <h1 class="title">The <span class="mark">Walk In</span></h1>
+  <p class="dek">How fans get from event parking to the stadium, and what role every street in the district should play.</p>
   <p class="byline">Source: Azira Pinnacle pathing &amp; visitation reports · anonymized, device-level GPS</p>
 </header>
 
-<section class="method guide" id="guide">
-  <p class="eyebrow">How to use this page</p>
-  <h2>What the filters do, and what they help you find</h2>
-  <p class="lede">The page has four maps and a set of filters. Some filters
-    only apply to the walk-in maps, so here is what each control does and what
-    question it helps answer.</p>
-
-  <div class="method-grid">
-    <div class="method-card">
-      <span class="tag">Map selector (top right of the map)</span>
-      <h3>Four maps, two questions</h3>
-      <ul>
-        <li><b>Volume</b> — which streets carry the most walkers between parking and
-          the stadium. Surfaces the <i>preferred walking routes</i> and choke points.</li>
-        <li><b>Local vs. Visitor</b> — the same routes colored by who uses them.
-          Surfaces whether Las Vegas residents and out-of-town visitors take different streets.</li>
-        <li><b>Street Type: Vehicle</b> — gateways (arterials) vs. local streets, from
-          district-wide data. Surfaces which streets move traffic in and out.</li>
-        <li><b>Street Type: Pedestrian</b> — streets with heavy pedestrian use, plus amber
-          event-day surges. Surfaces where to invest in sidewalks and amenities.</li>
-      </ul>
-      <p><b>Heads up:</b> the filters below the map apply to Volume and Local vs.
-        Visitor. The two Street Type maps are district-wide and do not change with them.</p>
-    </div>
-    <div class="method-card">
-      <span class="tag">Date range · Event type · busiest-date chips</span>
-      <h3>Pick a day, a game, or a season</h3>
-      <p>Narrow the walk-in maps to one date, a date range, one of the busiest dates, or
-        all dates of one event type (Raiders, UNLV, concerts, other). <b>Surfaces</b> how
-        route choice and walk times change with crowd size and event type — for example,
-        whether a sold-out Raiders game pushes people onto streets a smaller event never touches.</p>
-    </div>
-    <div class="method-card">
-      <span class="tag">Parking lots</span>
-      <h3>One lot, several, or all</h3>
-      <p>Select any lot (or combination) to see only the trips that started there.
-        <b>Surfaces</b> which streets each lot funnels its walkers onto, and which lots
-        depend on the same corridors. Lots with few qualifying devices are flagged low-confidence.</p>
-    </div>
-    <div class="method-card">
-      <span class="tag">Residency</span>
-      <h3>All, locals, or visitors</h3>
-      <p>Devices are classed by their common evening location. <b>Surfaces</b> whether
-        locals and visitors use different routes, and whether visitor trips run longer
-        (see the time-to-stadium chart).</p>
-    </div>
-    <div class="method-card">
-      <span class="tag">On the map: direction · trip mode · extras</span>
-      <h3>Direction, mode, and display options</h3>
-      <ul>
-        <li><b>Both / To stadium / Leaving</b> — compare arrival and departure routes; the
-          animation shows inbound (amber) vs. outbound (red).</li>
-        <li><b>All / Walking / Biking / Car</b> — isolate walkers from drivers and cyclists.
-          Mode is inferred from speed between pings, so treat it as indicative.</li>
-        <li><b>Top 20 busiest streets</b> and <b>share of trips</b> — rank streets, or show
-          each street as a percentage of the selected trips instead of a raw count.</li>
-        <li><b>Pause flow</b> and <b>Fullscreen</b> — display controls.</li>
-      </ul>
-    </div>
-    <div class="method-card">
-      <span class="tag">Charts and comparison (right panel)</span>
-      <h3>Numbers behind the map</h3>
-      <p>Estimated people per lot and attendance by lot, local vs. visitor split, time to
-        the stadium (5 or 10 minute bins), trips by time of day, and the busiest entry,
-        exit and top-20 points all update with your filters. <b>Compare against another
-        event</b> overlays another game's time-to-stadium curve from its saved data file.</p>
-    </div>
+<section class="intro" id="intro">
+  <div>
+    <h2>What this tool is</h2>
+    <p>A planning aid for the stadium district. It uses anonymized phone GPS pings to answer two questions, one after the other:</p>
+    <p><b>1. Where do people actually walk?</b> The first maps trace the routes fans take on foot from event parking to the stadium: which streets carry the most people, who uses them, and how long the walk takes.</p>
+    <p><b>2. What should each street be built for?</b> The last map gives every public street in the district one of three roles, so street design can match how the street is really used:</p>
+    <ul class="roles">
+      <li><i style="background:var(--gateway)"></i><span><span class="mark blue">Gateways</span> are arterials. They move people and vehicles into and out of the district.</span></li>
+      <li><i style="background:var(--pedestrian)"></i><span><span class="mark pink">Pedestrian streets</span> are non-arterials that carry heavy walking. Candidates for wider sidewalks and amenities.</span></li>
+      <li><i style="background:var(--local)"></i><span><span class="mark grey">Local streets</span> are everything else. Minimal treatment.</span></li>
+    </ul>
   </div>
-  <p class="chart-note">Scroll the guided steps on the left to see the maps change on their
-    own; the first time you touch a filter, the tour stops driving the map so your selection stays.</p>
+  <aside class="controls-card">
+    <h3>How to use the page</h3>
+    <dl>
+      <dt>Scroll</dt><dd>The text on the left drives the map on the right. The map stays in view.</dd>
+      <dt>View</dt><dd>Switch the map between <b>Volume</b>, <b>Local vs. Visitor</b> and <b>Street Roles</b>.</dd>
+      <dt>Filters</dt><dd>Open the drawer under the map to narrow by <b>date or event type</b> (Raiders, UNLV, concerts), <b>parking lot</b>, and <b>residency</b> (locals vs. visitors). They apply to the two walk-in views.</dd>
+      <dt>Direction &amp; mode</dt><dd>Show only trips <b>to</b> or <b>from</b> the stadium, or only walking, biking or car trips.</dd>
+      <dt>Hover</dt><dd>Any street shows its numbers. In Street Roles, click a legend row to isolate one role.</dd>
+    </dl>
+    <p class="tip">Touching a control pauses the guided scroll so your selection sticks. Use the <b>Resume tour</b> button above the map to hand control back.</p>
+  </aside>
 </section>
 
+<section class="story" id="story">
+  <div class="story-text" id="story-text">
 
-<section class="experience">
-  <div class="narrative-rail" id="narrative-rail">
-
-    <div class="step" data-lots="all" data-residency="all">
-      <p class="eyebrow">01 — The full picture</p>
-      <h2>Every qualifying trip, every lot</h2>
-      <p>Each colored line is a real street segment, matched from raw GPS
-        pings onto actual OpenStreetMap street geometry. Anything slower
-        than the study window, or that never reached the stadium, was
-        dropped as noise before this map was drawn.</p>
-      <p>Color and thickness show how many devices used that segment — the
-        brighter red streets carry the most foot traffic. The animated flow
-        direction shows whether a segment is carrying more people in
-        (amber) or out (red) for your current filter.</p>
+    <div class="step" data-mode="volume" data-lots="all" data-residency="all">
+      <p class="eyebrow">01 · The walk in</p>
+      <h2>Every route from parking to the stadium</h2>
+      <p>Each line is a real street segment, matched from raw GPS pings onto OpenStreetMap geometry. <span class="mark">Thicker and redder means more people.</span> Dashes flow amber toward the stadium and red away from it.</p>
+      <p class="small">Only devices seen in a mapped parking lot and then at the stadium are included, so this map mostly reflects event days and people on foot.</p>
     </div>
 
-    <div class="step" data-lots="Lot A" data-residency="all">
-      <p class="eyebrow">02 — Lot by lot</p>
-      <h2>Isolating a single lot</h2>
-      <p>Click any lot in the narrative or the picker to isolate it. Here's
-        <span class="hl" data-lot="Lot A">Lot A</span> on its own.</p>
+    <div class="step" data-mode="volume" data-lots="Lot A" data-residency="all">
+      <p class="eyebrow">02 · Lot by lot</p>
+      <h2>One lot at a time</h2>
+      <p>Here is <span class="mark lot-link" data-lot="Lot A" style="cursor:pointer">Lot A</span> alone. Each lot funnels its walkers onto a few streets, and different lots lean on the same corridors near the stadium.</p>
+      <p class="small">Click any lot on the map, or use the Filters drawer, to isolate another.</p>
     </div>
 
-    <div class="step" data-lots="all" data-residency="local">
-      <p class="eyebrow">03 — Locals vs. visitors</p>
-      <h2>How locals walk in</h2>
-      <p>Devices are classified by their Common Evening Location. Filtering
-        to <span class="hl" data-res="local">locals</span> surfaces whether
-        people who live in the Las Vegas metro favor different routes than
-        out-of-town visitors.</p>
+    <div class="step" data-mode="residency" data-lots="all" data-residency="all">
+      <p class="eyebrow">03 · Who walks where</p>
+      <h2>Locals and visitors use different streets</h2>
+      <p>The same routes, now colored by who walks them: <span class="mark green">teal is local-heavy</span>, <span class="mark" style="background:linear-gradient(transparent 52%,#d9ccff 52%,#d9ccff 92%,transparent 92%)">violet is visitor-heavy</span>. A device is a local if its common evening location is in the Las Vegas metro.</p>
     </div>
 
-    <div class="step" data-lots="all" data-residency="visitor">
-      <p class="eyebrow">04 — Locals vs. visitors</p>
-      <h2>How visitors walk in</h2>
-      <p>Now the same lots, filtered to <span class="hl" data-res="visitor">visitors</span>
-        only. Check the time-to-stadium chart below the map — visitor trips
-        often run slower on average.</p>
+    <div class="step" data-mode="residency" data-lots="all" data-residency="visitor">
+      <p class="eyebrow">04 · Visitors only</p>
+      <h2>How out-of-town fans walk in</h2>
+      <p>Filtered to <span class="mark">visitors</span>. Compare with the all-trips view in step 01. The time-to-stadium chart in the numbers below shows whether visitor trips run longer.</p>
     </div>
 
-    <div class="step" data-lots="all" data-residency="all">
-      <p class="eyebrow">05 — Explore</p>
-      <h2>Build your own view</h2>
-      <p>Once you touch the picker or toggle below, this guided tour stops
-        driving the map so your selection sticks — scroll freely without
-        losing it.</p>
-      <div class="override-note" id="override-note">Manual mode is on — scrolling
-        through the steps above will highlight this text but won't change
-        your map selection. Reload the page to restart the guided tour.</div>
+    <div class="step" data-mode="street_roles" data-role="" data-lots="all" data-residency="all">
+      <p class="eyebrow">05 · From routes to street roles</p>
+      <h2>Now give every street a job</h2>
+      <p>The map switches to a single view of the whole district. The logic is deliberately simple:</p>
+      <ul>
+        <li><span class="role-chip gateway">Arterial</span> becomes a <b>gateway</b>.</li>
+        <li><span class="role-chip pedestrian">Heavy walking</span> becomes a <b>pedestrian street</b>.</li>
+        <li><span class="role-chip local">Everything else</span> becomes a <b>local street</b>.</li>
+      </ul>
+      <p>Roles come from <span class="mark">all devices near any district building on all days</span>, not only stadium trips. Event-day crowds would otherwise make every street look like a footpath.</p>
+    </div>
+
+    <div class="step" data-mode="street_roles" data-role="gateway" data-lots="all" data-residency="all">
+      <p class="eyebrow">06 · Gateways</p>
+      <h2><span data-fill="n-gateway">–</span> arterials carry people in and out</h2>
+      <p>OpenStreetMap motorway, trunk, primary and secondary roads: <span data-fill="gateway-names">–</span>. These are designed to move people and vehicles through the district edge, not to be walked.</p>
+      <div class="callout"><b>Dual role.</b> <span data-fill="dual-names">–</span> is an arterial that is also a major walk-in route. It keeps the gateway role and is flagged in its tooltip.</div>
+    </div>
+
+    <div class="step" data-mode="street_roles" data-role="pedestrian_corridor" data-lots="all" data-residency="all">
+      <p class="eyebrow">07 · Pedestrian streets</p>
+      <h2>Streets where people on foot dominate</h2>
+      <p>A non-arterial becomes a pedestrian street only if it passes <b>both</b> tests:</p>
+      <ul>
+        <li>it carries at least <span class="mark pink">5% of all walking lot-to-stadium trips</span>, which is what the first maps show, and</li>
+        <li>it has at least <span class="mark pink">300 walking or standing observations on ordinary days</span> in the district-wide data.</li>
+      </ul>
+      <p>Today that is <span data-fill="ped-names">–</span>. A street can carry heavy car traffic and still qualify. What counts is how many people walk it. These are the streets to design with <b>wider sidewalks and pedestrian amenities</b>.</p>
+    </div>
+
+    <div class="step" data-mode="street_roles" data-role="local_street" data-lots="all" data-residency="all">
+      <p class="eyebrow">08 · Local streets</p>
+      <h2>Everything else needs only minimal treatment</h2>
+      <p><span data-fill="n-local">–</span> streets are access streets. Thin-data streets are drawn <span class="mark">dashed</span> to signal low confidence. Parking aisles, driveways and footways are left out.</p>
+    </div>
+
+    <div class="step" data-mode="street_roles" data-role="event" data-lots="all" data-residency="all">
+      <p class="eyebrow">09 · Event-day surges</p>
+      <h2>Game days are flagged, never decisive</h2>
+      <p>A yellow halo marks a street that is at least <span class="mark">10 points more pedestrian on event days than on ordinary days from the same months</span>. Matching months matters because GPS ping frequency changes a lot through the year.</p>
+      <p>The halo is information for event operations. It never changes a street's role.</p>
+    </div>
+
+    <div class="step" data-mode="street_roles" data-role="" data-lots="all" data-residency="all" id="step-explore">
+      <p class="eyebrow">10 · Your turn</p>
+      <h2>Explore it yourself</h2>
+      <p>Open the <b>Filters</b> drawer under the map to narrow by date, event type, lot or residency, then scroll down for the numbers behind the map. The method section at the bottom covers the data and its limits.</p>
+      <button class="step-cta" id="open-filters-btn">Open filters ↗</button>
+      <div class="override-note" id="override-note">Guided tour paused. Your selection will stay put as you scroll. Use <b>Resume tour</b> above the map to hand control back.</div>
     </div>
 
   </div>
 
-  <div class="side-panel">
+  <div class="story-map" id="story-map">
+    <div class="map-head">
+      <div class="seg" id="map-mode-toggle" role="tablist" aria-label="Map view">
+        <button data-mode="volume" class="active">Volume</button>
+        <button data-mode="residency">Local vs. Visitor</button>
+        <button data-mode="street_roles">Street Roles</button>
+      </div>
+      <button class="pill-btn tour-pill" id="tour-pill">● Guided tour</button>
+      <div class="walkin-controls" id="walkin-controls">
+        <div class="seg small" id="direction-filter-toggle">
+          <button data-direction="all" class="active">Both ways</button>
+          <button data-direction="to_stadium">→ To stadium</button>
+          <button data-direction="from_stadium">← Leaving</button>
+        </div>
+        <div class="seg small" id="mode-filter-toggle">
+          <button data-trip-mode="all" class="active">All modes</button>
+          <button data-trip-mode="walking">Walking</button>
+          <button data-trip-mode="biking">Biking</button>
+          <button data-trip-mode="car">Car</button>
+        </div>
+        <button class="pill-btn" id="top20-toggle">☆ Top 20 streets</button>
+        <button class="pill-btn" id="share-mode-toggle">% Share of trips</button>
+        <button class="pill-btn" id="flow-pause-toggle">⏸ Pause flow</button>
+      </div>
+    </div>
+
     <div class="map-zone">
       <div id="map"></div>
+      <button class="pill-btn fs-btn" id="fullscreen-toggle">⛶ Fullscreen</button>
       <div class="street-match-note" id="street-match-note">
         No street-matched data in this export — showing straight-line
         GPS-derived paths. Re-run the pipeline with <code>--street-match</code>
         for real street-segment volumes.
       </div>
-      <div class="map-mode-toggle" id="map-mode-toggle">
-        <button data-mode="volume" class="active">Volume</button>
-        <button data-mode="residency">Local vs. Visitor</button>
-        <button data-mode="street_type_vehicle">Street Type: Vehicle</button>
-        <button data-mode="street_type_pedestrian">Street Type: Pedestrian</button>
-      </div>
-      <button class="map-icon-btn" id="top20-toggle" style="position:absolute;top:3.1rem;right:.8rem;z-index:500;">☆ Highlight top 20 busiest streets</button>
-      <button class="map-icon-btn" id="share-mode-toggle" style="position:absolute;top:5.4rem;right:.8rem;z-index:500;">% Show as share of trips</button>
-      <button class="map-icon-btn" id="fullscreen-toggle" style="position:absolute;top:.8rem;left:.8rem;z-index:500;">⛶ Fullscreen</button>
-      <button class="map-icon-btn" id="flow-pause-toggle" style="position:absolute;top:3.1rem;left:.8rem;z-index:500;">⏸ Pause flow animation</button>
-      <div class="map-mode-toggle" id="direction-filter-toggle" style="position:absolute;top:5.4rem;left:.8rem;right:auto;">
-        <button data-direction="all" class="active">Both</button>
-        <button data-direction="to_stadium">→ To Stadium</button>
-        <button data-direction="from_stadium">← Leaving</button>
-      </div>
-      <div class="map-mode-toggle" id="mode-filter-toggle" style="position:absolute;top:7.7rem;left:.8rem;right:auto;">
-        <button data-trip-mode="all" class="active">All modes</button>
-        <button data-trip-mode="walking">🚶 Walking</button>
-        <button data-trip-mode="biking">🚲 Biking</button>
-        <button data-trip-mode="car">🚗 Car</button>
-      </div>
-      <div class="color-legend" id="color-legend">
-        <div id="legend-label">Devices per segment</div>
+      <div class="legend-box" id="color-legend">
+        <div class="lg-title" id="legend-label">Devices per segment</div>
         <div class="ramp" id="legend-ramp"></div>
-        <div style="display:flex;justify-content:space-between;" id="legend-minmax-row"><span id="legend-min">low</span><span id="legend-max">high</span></div>
+        <div class="minmax" id="legend-minmax-row"><span id="legend-min">low</span><span id="legend-max">high</span></div>
         <div class="legend-categorical" id="legend-categorical"></div>
-      </div>
-      <div class="legend">
-        <span id="legend-to-stadium"><i class="swatch" style="background:var(--torch-amber)"></i>Flow to stadium</span>
-        <span id="legend-from-stadium"><i class="swatch" style="background:var(--allegiant-red)"></i>Flow from stadium</span>
+        <div class="flows" id="legend-flows">
+          <span id="legend-to-stadium"><i class="swatch" style="background:var(--to-stadium)"></i>To stadium</span>
+          <span id="legend-from-stadium"><i class="swatch" style="background:var(--from-stadium)"></i>From stadium</span>
+        </div>
       </div>
     </div>
 
     <div class="mode-explainer" id="mode-explainer"></div>
 
-    <div class="panel-scroll">
-      <h4>Date range</h4>
+    <details class="filters" id="filters">
+      <summary>Filters <span class="filter-summary" id="filter-summary"></span></summary>
+      <div class="filters-body">
+<h4>Date range</h4>
       <p class="chart-note" id="date-range-note"></p>
       <div class="lot-chip-row">
-        <input type="date" id="date-start-input" style="font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--silver);border-radius:5px;padding:.3rem;">
-        <input type="date" id="date-end-input" style="font-family:var(--mono);font-size:.7rem;background:var(--panel);border:1px solid var(--line);color:var(--silver);border-radius:5px;padding:.3rem;">
+        <input type="date" id="date-start-input">
+        <input type="date" id="date-end-input">
         <button id="date-reset-btn">All dates</button>
       </div>
       <div class="lot-chip-row" id="busiest-dates-row" style="flex-wrap:wrap;"></div>
@@ -603,38 +440,55 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
         <button class="res-btn" data-res="visitor">Visitors</button>
       </div>
 
-      <h4>Selection summary</h4>
-      <div class="hud-row"><span>Devices</span><b id="hud-devices">–</b></div>
-      <div class="hud-row"><span>Median time in</span><b id="hud-time-in">–</b></div>
-      <div class="hud-row"><span>Median time out</span><b id="hud-time-out">–</b></div>
-      <div class="hud-row"><span>Local / Visitor</span><b id="hud-res">–</b></div>
+      
+      </div>
+    </details>
+  </div>
+</section>
 
-      <h4>Estimated people per lot (live-filtered)</h4>
-      <p class="chart-note">Scaled from our device sample using a single flat rate, and updates with your lot/date/residency filters above. For a more precise (but non-filterable) per-event calculation, see "Estimated actual attendance by lot" below.</p>
+<section class="numbers" id="numbers">
+  <p class="eyebrow">The numbers behind the walk-in maps</p>
+  <h2>What the current filters add up to</h2>
+  <p class="lede">These charts follow the filters in the drawer under the map (date, event type, lots, residency). <a href="#story">Back to the map</a> to change them. Street Roles is district-wide and does not use these filters.</p>
+
+  <div class="hud">
+    <div class="hud-row"><span>Devices</span><b id="hud-devices">–</b></div>
+    <div class="hud-row"><span>Median time in</span><b id="hud-time-in">–</b></div>
+    <div class="hud-row"><span>Median time out</span><b id="hud-time-out">–</b></div>
+    <div class="hud-row"><span>Local / Visitor</span><b id="hud-res">–</b></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="card">
+      <h3>Estimated people per lot</h3>
+      <p class="chart-note">Scaled from our device sample using one flat rate. Updates with your filters.</p>
       <div class="chart-wrap"><canvas id="chart-devices"></canvas></div>
-
-      <h4>Estimated actual attendance by lot</h4>
+    </div>
+    <div class="card">
+      <h3>Estimated actual attendance by lot</h3>
       <p class="chart-note" id="extrapolation-note"></p>
       <div class="chart-wrap"><canvas id="chart-extrapolation"></canvas></div>
-
-      <h4>Local vs. visitor by lot</h4>
+    </div>
+    <div class="card">
+      <h3>Local vs. visitor by lot</h3>
       <div class="chart-wrap"><canvas id="chart-residency"></canvas></div>
-
-      <h4>Time to stadium</h4>
+    </div>
+    <div class="card">
+      <h3>Time to stadium</h3>
       <div class="bin-toggle" id="bin-toggle">
         <button data-bin="5" class="active">5 min bins</button>
         <button data-bin="10">10 min bins</button>
       </div>
-      <div class="chart-wrap">
-        <canvas id="chart-histogram"></canvas>
-        <p class="chart-note" id="histogram-note"></p>
-      </div>
-
-      <h4>Trips by time of day</h4>
+      <div class="chart-wrap"><canvas id="chart-histogram"></canvas></div>
+      <p class="chart-note" id="histogram-note"></p>
+    </div>
+    <div class="card">
+      <h3>Trips by time of day</h3>
       <p class="chart-note" id="tod-note"></p>
       <div class="chart-wrap"><canvas id="chart-time-of-day"></canvas></div>
-
-      <h4>Busiest points</h4>
+    </div>
+    <div class="card">
+      <h3>Busiest points</h3>
       <div class="lot-chip-row" id="ranking-mode-toggle">
         <button data-ranking="entry" class="active">Entry</button>
         <button data-ranking="exit">Exit</button>
@@ -642,131 +496,73 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
       </div>
       <p class="chart-note" id="entry-points-note"></p>
       <div class="chart-wrap"><canvas id="chart-entry-points"></canvas></div>
-
-      <div class="event-compare">
-        <h4 style="margin-top:0;">Compare against another event</h4>
-        <p class="chart-note">Load another game's <code>dashboard_data.json</code>
-          (built by the same pipeline) to overlay its time-to-stadium
-          distribution on the chart above.</p>
-        <input type="file" id="event-file-input" accept="application/json" multiple>
-        <div class="event-chip-list" id="event-chip-list"></div>
-      </div>
+    </div>
+    <div class="card wide event-compare">
+      <h3>Compare against another event</h3>
+      <p class="chart-note">Load another game's <code>dashboard_data.json</code> (built by the same pipeline) to overlay its time-to-stadium distribution on the chart above.</p>
+      <input type="file" id="event-file-input" accept="application/json" multiple>
+      <div class="event-chip-list" id="event-chip-list"></div>
     </div>
   </div>
 </section>
 
 <section class="method" id="method">
-  <p class="eyebrow">Method — how to read this page</p>
+  <p class="eyebrow">Method</p>
   <h2>Two analyses, two different questions</h2>
-  <p class="lede">This page answers two separate questions with two separate
-    sets of devices. Mixing them up is the easiest way to misread the maps,
-    so they are kept apart on purpose — and then brought back together to
-    support the street designations.</p>
+  <p class="lede">This page uses two separate sets of devices. They are kept apart on purpose, then brought together to support the street roles.</p>
 
   <div class="method-grid">
     <div class="method-card">
-      <span class="tag">Maps 1–2 · Volume, Local vs. Visitor</span>
+      <span class="tag">Volume · Local vs. Visitor</span>
       <h3>The walk in from parking</h3>
-      <p><b>Question:</b> which streets do people actually use to get from a
-        parking lot to the stadium, and how long does it take?</p>
-      <p><b>Population:</b> only devices seen in a mapped parking lot and then
-        at the stadium. Anchored to stadium visits, it mostly reflects
-        <b>event days</b> and walkers. These are the <b>preferred walking
-        routes</b> that back up every pedestrian-street designation.</p>
+      <p><b>Question:</b> which streets do people use to get from a parking lot to the stadium, and how long does it take?</p>
+      <p><b>Population:</b> only devices seen in a mapped parking lot and then at the stadium. It mostly reflects <b>event days</b> and walkers. These are the preferred walking routes that back every pedestrian-street designation.</p>
     </div>
     <div class="method-card">
-      <span class="tag">Maps 3–4 · Street Type</span>
-      <h3>The role each street plays in the district</h3>
-      <p><b>Question:</b> which streets should be designed as gateways, which
-        as pedestrian streets, and which as local streets?</p>
-      <p><b>Population:</b> every device seen near <i>any</i> building in the
-        district over the whole data period, including ordinary non-event
-        days, so vehicle traffic is not drowned out by event-day crowds.</p>
+      <span class="tag">Street Roles</span>
+      <h3>The role each street plays</h3>
+      <p><b>Question:</b> which streets should be gateways, which pedestrian streets, and which local streets?</p>
+      <p><b>Population:</b> every device seen near <i>any</i> building in the district over the whole data period, including ordinary non-event days, so vehicle traffic is not drowned out by event crowds.</p>
     </div>
   </div>
 
   <details open>
-    <summary>The three street roles (and the design intent behind them)</summary>
+    <summary>The three street roles</summary>
     <ul>
-      <li><b>Gateway</b> — an arterial (OpenStreetMap motorway / trunk / primary /
-        secondary). Designed to move people and vehicles into and out of the district.</li>
-      <li><b>Pedestrian street</b> — a non-arterial with <i>heavy pedestrian use</i>:
-        it carries at least 5% of all walking lot-to-stadium trips (the Volume map)
-        <i>and</i> has at least 300 walking or standing observations on ordinary
-        days in the district-wide data. These are the streets to design with wider
-        sidewalks and pedestrian amenities. A street can carry heavy car traffic and
-        still qualify — what counts is how many people walk it.</li>
-      <li><b>Local street</b> — everything else. Minimal treatment; streets with thin
-        data are drawn dashed (low confidence).</li>
-      <li>An arterial that is also a major walk-in route (West Hacienda Avenue) keeps
-        the gateway role and is noted in its tooltip as a dual-role street.</li>
-      <li>Parking-lot aisles, driveways and footways are left out; only real public
-        streets are typed.</li>
+      <li><b>Gateway:</b> an arterial (OpenStreetMap motorway, trunk, primary or secondary). Designed to move people and vehicles into and out of the district.</li>
+      <li><b>Pedestrian street:</b> a non-arterial that carries at least 5% of all walking lot-to-stadium trips <i>and</i> has at least 300 walking or standing observations on ordinary days. Designed with wider sidewalks and amenities.</li>
+      <li><b>Local street:</b> everything else. Minimal treatment. Thin-data streets are drawn dashed.</li>
+      <li>An arterial that is also a major walk-in route keeps the gateway role and is noted in its tooltip as a dual-role street.</li>
+      <li>Parking-lot aisles, driveways and footways are left out. Only public streets are typed.</li>
     </ul>
   </details>
 
   <details>
-    <summary>Why two populations? (the skew we found)</summary>
-    <p>Typing streets only from stadium-anchored trips labeled almost every street
-      a pedestrian corridor, even major roads like Dean Martin Drive and Tropicana
-      Avenue. We checked: event dates were about 42% of device-days in that extract
-      with roughly 5× the activity of other days. A broader district-wide extract cut
-      event dates to about 10% of device-days, and the major arterials then read
-      as vehicle roads.</p>
+    <summary>Why two populations? The skew we found</summary>
+    <p>Typing streets only from stadium-anchored trips labeled almost every street a pedestrian corridor, even Dean Martin Drive and Tropicana Avenue. Event dates were about 42% of device-days in that extract. A broader district-wide extract cut event dates to about 10% of device-days, and the major arterials then read as vehicle roads.</p>
   </details>
 
   <details>
-    <summary>How event days are handled (without letting them skew the result)</summary>
-    <p>The district-wide data supplies each street's <b>ordinary-day</b> pedestrian
-      volume; event days cannot create a role on their own. Event-day behavior is
-      reported separately as an amber <b>event-day surge</b> flag — a rise of at least
-      10 points in pedestrian share compared with ordinary days <b>from the same
-      months</b>. (GPS ping frequency varies a lot by month, median gap about 3
-      seconds in early 2025 versus about 40 seconds in summer 2025, which would
-      otherwise look like an event effect.)</p>
+    <summary>How event days are handled</summary>
+    <p>The district-wide data supplies each street's <b>ordinary-day</b> pedestrian volume, and event days cannot create a role on their own. Event-day behavior is reported separately as the yellow <b>surge</b> halo: a rise of at least 10 points in pedestrian share compared with ordinary days <b>from the same months</b>. GPS ping frequency varies a lot by month (median gap about 3 seconds in early 2025, about 40 seconds in summer 2025), which would otherwise look like an event effect.</p>
   </details>
 
   <details>
     <summary>Limits to keep in mind</summary>
     <ul>
-      <li>Travel mode is inferred from speed between GPS pings, which is imprecise
-        when pings are sparse. Slow or stop-and-go cars near the Strip can look like
-        bikes, so for street typing "biking" is counted as vehicle traffic.</li>
-      <li>Pedestrian observations are relative signals from speed, not counted
-        pedestrians. Pedestrian streets are supported by the walk-in routes precisely
-        because those are measured from lot-to-stadium trips.</li>
-      <li>The walk-in routes come from stadium trips, so a street away from the
-        stadium path will not qualify as a pedestrian street here even if people
-        walk it.</li>
-      <li>The thresholds (5% of walking trips, 300 observations) are judgment calls
-        and are adjustable in the code.</li>
-      <li>Census commute-mode data for the district's block group (about 623 workers)
-        was reviewed as a plausibility check only; it describes residents, not people
-        who work in the district.</li>
+      <li>Travel mode is inferred from speed between GPS pings, which is imprecise when pings are sparse. Slow or stop-and-go cars near the Strip can look like bikes, so for street typing "biking" counts as vehicle traffic.</li>
+      <li>Pedestrian observations are relative signals from speed, not counted pedestrians. That is why pedestrian streets must also be supported by measured lot-to-stadium walking trips.</li>
+      <li>Walk-in routes come from stadium trips, so a street away from the stadium path will not qualify as a pedestrian street here even if people walk it.</li>
+      <li>The thresholds (5% of walking trips, 300 observations) are judgment calls and are adjustable in the code.</li>
+      <li>Census commute-mode data for the district's block group (about 623 workers) was reviewed as a plausibility check only. It describes residents, not people who work in the district.</li>
     </ul>
   </details>
   <p class="chart-note">Full methodology, thresholds and code are in the repository README.</p>
 </section>
 
 <footer>
-  <p><b>Methodology.</b> Trips are reconstructed from an Azira Pinnacle
-    Pathing X export, with stadium arrival independently confirmed by a Pin
-    report and spatially matched against the exact stadium footprint. A
-    device only appears here if it pinged inside a mapped lot polygon and
-    reached the stadium within the study's post-window; devices that never
-    showed a confirmed arrival in that window were excluded as noise.
-    Residency is derived from each device's Common Evening Location relative
-    to the Las Vegas metro area. Lots with fewer than <code>38</code>
-    qualifying devices are flagged low-confidence.</p>
-  <p><b>Street segments</b> are matched offline, in the Python pipeline,
-    against real OpenStreetMap street-centerline geometry (via
-    <code>--street-match</code>) — not guessed live in the browser. Segment
-    color and thickness show device volume; the animated flow direction
-    shows whether a segment carries more inbound or outbound traffic for the
-    current filter. "Devices per segment" and "entry points" both recompute
-    live as you change the lot/residency filters, since the underlying data
-    shipped to the browser is each trip's matched street sequence, not a
-    single pre-baked total.</p>
+  <p><b>Methodology.</b> Trips are reconstructed from an Azira Pinnacle Pathing X export, with stadium arrival independently confirmed by a Pin report and spatially matched against the exact stadium footprint. A device only appears here if it pinged inside a mapped lot polygon and reached the stadium within the study's post-window. Residency is derived from each device's Common Evening Location relative to the Las Vegas metro area. Lots with fewer than <code>38</code> qualifying devices are flagged low-confidence.</p>
+  <p><b>Street segments</b> are matched offline, in the Python pipeline, against OpenStreetMap street-centerline geometry (via <code>--street-match</code>), not guessed live in the browser. Segment color and thickness show device volume; the animated flow shows whether a segment carries more inbound or outbound traffic for the current filter.</p>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -821,11 +617,11 @@ const events = [{
   id: "primary",
   meta: EVENT_META || {name: "This event", date: "", type: "unknown"},
   data: PRIMARY_DATA,
-  color: "#ffb648",
+  color: "#f2a900",
 }];
 
 const LOT_COLORS = {};
-const PALETTE = ["#ffb648","#3ec9a7","#b98cf2","#e0664a","#6fb1ff","#f2d24f","#ff8fb3","#8fe3c7"];
+const PALETTE = ["#ffd23f","#5ed3b8","#c4a8ff","#ff9a76","#8fc1ff","#b7e35a","#ff9fc0","#7fe0e0"];
 Object.keys(PRIMARY_DATA.lot_centroids.lots).forEach((lot,i)=>{
   LOT_COLORS[lot] = PALETTE[i % PALETTE.length];
 });
@@ -846,8 +642,8 @@ const map = L.map('map', {zoomControl:true, scrollWheelZoom:true})
 // .leaflet-tile-pane in <style>), which leaves the route overlays --
 // polylines, markers, the whole leaflet-overlay-pane -- completely
 // unaffected since that's a separate Leaflet pane.
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; OpenStreetMap contributors &copy; CARTO', subdomains:'abcd', maxZoom:19
 }).addTo(map);
 
 L.circleMarker([stadium.lat, stadium.lon], {
@@ -857,7 +653,7 @@ L.circleMarker([stadium.lat, stadium.lon], {
 const lotMarkers = {};
 Object.entries(PRIMARY_DATA.lot_centroids.lots).forEach(([lot, c])=>{
   const m = L.circleMarker([c.lat, c.lon], {
-    radius:8, color:'#0c0d10', weight:2, fillColor: LOT_COLORS[lot], fillOpacity:1, className:'lot-marker'
+    radius:8, color:'#17160f', weight:2, fillColor: LOT_COLORS[lot], fillOpacity:1, className:'lot-marker'
   }).addTo(map).bindTooltip(`<b>${lot}</b><br>Click to see routes to/from this lot`);
   m.on('click', ()=>{
     manualOverride = true;
@@ -942,8 +738,8 @@ const EVENT_TYPE_LABELS = {
   concert: 'Concerts', other_event: 'Other major events', unlabeled: 'Unlabeled dates',
 };
 const EVENT_TYPE_COLORS = {
-  nfl_home_game: '#a6192e', college_football: '#ffb648', concert: '#3ec9a7',
-  other_event: '#b98cf2', unlabeled: '#7d8394',
+  nfl_home_game: '#a6192e', college_football: '#f2a900', concert: '#13a389',
+  other_event: '#7a5cd6', unlabeled: '#6f6a5c',
 };
 let activeEventType = 'all'; // 'all' | a key in EVENT_TYPE_LABELS
 
@@ -1111,13 +907,13 @@ function lerpColor(c1, c2, t){
   return `rgb(${rgb.join(',')})`;
 }
 function volumeColor(t){ // t in [0,1]
-  if(t < 0.5) return lerpColor('3a3f4c', 'ffb648', t/0.5);
-  return lerpColor('ffb648', 'a6192e', (t-0.5)/0.5);
+  if(t < 0.5) return lerpColor('d3d0c4', 'f2a900', t/0.5);
+  return lerpColor('f2a900', 'a6192e', (t-0.5)/0.5);
 }
 function residencyDiffColor(t){ // t in [-1,1], -1=all visitor, +1=all local
   const norm = (t+1)/2;
-  if(norm < 0.5) return lerpColor('b98cf2', '4a4f5c', norm/0.5);
-  return lerpColor('4a4f5c', '3ec9a7', (norm-0.5)/0.5);
+  if(norm < 0.5) return lerpColor('7a5cd6', 'd3d0c4', norm/0.5);
+  return lerpColor('d3d0c4', '13a389', (norm-0.5)/0.5);
 }
 
 /* ============================================================== */
@@ -1130,13 +926,10 @@ function median(arr){
   return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 
-let mapMode = 'volume'; // 'volume' | 'residency' | 'street_type_vehicle' | 'street_type_pedestrian'
-// The two street_type_* modes are a deliberately separate exhibit pair: vehicle streets
-// (gateway vs. local_street) and pedestrian corridors have very different trip-count
-// magnitudes, so sharing one volume/weight scale between them would wash the smaller
-// one out entirely. Each is scaled only against the max within its own subset (see
-// renderStreetTypeSegments). unclassified corridors render in whichever exhibit mode is
-// active when touched, scaled with that mode's own max.
+let mapMode = 'volume'; // 'volume' | 'residency' | 'street_roles'
+let roleFocus = null; // null | 'gateway' | 'pedestrian_corridor' | 'local_street' | 'event'
+// Street Roles is one consolidated map: gateway / pedestrian street / local street, with an
+// event-day surge halo, scaled per role (see renderStreetRoles).
 let rankingMode = 'entry'; // 'entry' | 'exit' | 'top20' -- drives the ranked chart below the map
 let top20Highlight = false; // white-halo outline on the map for the 20 busiest corridors
 let shareMode = false; // show % of filtered trips instead of raw device counts -- more
@@ -1153,30 +946,25 @@ let modeFilter = 'all'; // 'all' | 'walking' | 'biking' | 'car' -- restricts eve
 // (walking-dominant), local_street (vehicle-dominant, not a major road). Reuses the
 // existing palette so this mode doesn't introduce a fourth unrelated color language.
 const STREET_TYPE_COLORS = {
-  gateway: '#e0664a',
-  pedestrian_corridor: '#3ec9a7',
-  event_pedestrian_corridor: '#ffb648',
-  local_street: '#b98cf2',
-  unclassified: '#6b7280',
-  insufficient_data: '#6b7280',
+  gateway: '#2b4fb3',
+  pedestrian_corridor: '#e0267a',
+  local_street: '#8b8c94',
 };
 const STREET_TYPE_LABELS = {
   gateway: 'Gateway (arterial)',
   pedestrian_corridor: 'Pedestrian street (heavy walking use)',
-  event_pedestrian_corridor: 'Event-day pedestrian surge',
   local_street: 'Local street',
-  unclassified: 'Unclassified (no mode data)',
+  unclassified: 'Local street',
   insufficient_data: 'Local street (thin data)',
 };
+const SURGE_COLOR = '#ffd400';
 const MODE_EXPLAINERS = {
-  volume: ['Volume — the walk in from parking',
-    'Each line is a real street segment; color and thickness show how many devices used it between a mapped parking lot and the stadium. Built from stadium-anchored trips, so it mostly reflects <b>event days</b> and walkers. It answers "which routes do fans use?", not "how are streets used day to day?"'],
-  residency: ['Local vs. Visitor — who uses which route',
-    'Same stadium-anchored trips as Volume, colored by whether the device\'s common evening location is in the Las Vegas metro (local) or elsewhere (visitor). Event-day population, walk-in routes only.'],
-  street_type_vehicle: ['Street Type: Vehicle — gateways and local streets',
-    'Gateways are arterials (OpenStreetMap primary / secondary / trunk) that carry people and vehicles into and out of the district; every other street that is not a pedestrian street is local. Role assignment uses a broader district-wide extract (all devices near any district building, all days), <b>not</b> just stadium trips. Dashed = thin data.'],
-  street_type_pedestrian: ['Street Type: Pedestrian — streets with heavy walking use',
-    'Teal streets are non-arterials that carry at least 5% of walking lot-to-stadium trips (see the Volume map) <b>and</b> have at least 300 walking/standing observations on ordinary days. Amber marks an event-day surge: at least 10 points more pedestrian than ordinary days <b>from the same months</b>. Observations come from speed between GPS pings, so read them as relative signals, not counted pedestrians.'],
+  volume: ['Volume.',
+    'Each line is a street segment between a mapped parking lot and the stadium. Thicker and redder means more devices. Built from stadium trips, so it mostly reflects event days and people on foot.'],
+  residency: ['Local vs. Visitor.',
+    'The same stadium trips, colored by whether the device\'s common evening location is in the Las Vegas metro (teal) or elsewhere (violet).'],
+  street_roles: ['Street Roles.',
+    'Every public street in the district gets one role, using all devices near any district building on all days. Click a legend row to isolate a role. Dashed lines have thin data. Yellow halo = event-day surge.'],
 };
 function updateModeExplainer(){
   const el = document.getElementById('mode-explainer');
@@ -1229,8 +1017,8 @@ function scaledWeight(fraction, {min = 2.5, max = 9, floor = 2.5} = {}){
 }
 
 function renderStreetSegments(lots, residencyFilter){
-  if(mapMode === 'street_type_vehicle' || mapMode === 'street_type_pedestrian'){
-    renderStreetTypeSegments(mapMode);
+  if(mapMode === 'street_roles'){
+    renderStreetRoles();
     return;
   }
 
@@ -1272,7 +1060,7 @@ function renderStreetSegments(lots, residencyFilter){
     if(isTop20){
       // A wide, dim white halo drawn first, then the real line on top --
       // reads as a highlighted outline without needing a second map mode.
-      L.polyline(path, {color:'#ffffff', weight: weight + 5, opacity:.35, lineCap:'round'}).addTo(routeLayer);
+      L.polyline(path, {color:'#17160f', weight: weight + 5, opacity:.18, lineCap:'round'}).addTo(routeLayer);
       weight = Math.max(weight, 4);
     }
 
@@ -1303,77 +1091,108 @@ function renderStreetSegments(lots, residencyFilter){
 // and only within whichever of the two subtypes (vehicle or pedestrian) is
 // currently showing, so the much smaller pedestrian-corridor sample never
 // gets washed out by vehicle-street volumes or vice versa.
-const STREET_TYPE_SUBTYPES = {
-  // 'unclassified' corridors (touched by trips with no mode-classified
-  // leg) are shown in the vehicle exhibit by default -- a corridor with no
-  // mode data at all is far more often a quiet street a car drove past
-  // too briefly to resolve than a pedestrian-only path, and leaving it out
-  // of both exhibits would silently drop real streets from the map.
-  street_type_vehicle: ['gateway', 'local_street', 'unclassified'],
-  street_type_pedestrian: ['pedestrian_corridor'],
-};
+const ROLE_ORDER = ['local_street','gateway','pedestrian_corridor'];
+function roleOf(cls){
+  if(cls.type === 'gateway' || cls.type === 'pedestrian_corridor') return cls.type;
+  return 'local_street'; // local, unclassified, insufficient_data
+}
 
-function renderStreetTypeSegments(mode){
-  const includedTypes = new Set(STREET_TYPE_SUBTYPES[mode]);
+function renderStreetRoles(){
   const geometries = EFFECTIVE_STREET_TYPE_GEOMETRIES;
   const corridors = STREET_TYPE_EDGE_CORRIDORS;
 
-  // First pass: find this subtype's own max vote count, so weight/color
-  // scale against "busiest corridor in THIS exhibit," not the other one.
-  const seenCorridors = new Set();
-  let maxVotes = 1;
-  const showsCorridor = (cls)=> cls && cls.type !== 'excluded_private' && (
-    includedTypes.has(cls.type) ||
-    (mode === 'street_type_pedestrian' && cls.event_pedestrian_flag));
+  // Per-role max vote count so line weight within a role reflects relative use
+  // without letting the busiest gateways wash out smaller pedestrian streets.
+  const maxByRole = {local_street:1, gateway:1, pedestrian_corridor:1};
+  const items = [];
+  const seen = new Set();
   Object.keys(geometries).forEach(key=>{
     const corridor = corridors[key];
     const cls = STREET_CLASSIFICATION[corridor];
-    if(!showsCorridor(cls)) return;
-    if(seenCorridors.has(corridor)) return;
-    seenCorridors.add(corridor);
-    maxVotes = Math.max(maxVotes, cls.n_votes || 0);
+    if(!cls || cls.type === 'excluded_private') return;
+    const role = roleOf(cls);
+    if(!seen.has(corridor)){
+      seen.add(corridor);
+      maxByRole[role] = Math.max(maxByRole[role], cls.n_votes || 0);
+    }
+    items.push({key, corridor, cls, role, path: geometries[key]});
+  });
+  items.sort((a,b)=> ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+
+  const pct = (v)=> (v === null || v === undefined) ? '–' : Math.round(v*100) + '%';
+  const dim = (it)=>{
+    if(!roleFocus) return false;
+    if(roleFocus === 'event') return !it.cls.event_pedestrian_flag;
+    return it.role !== roleFocus;
+  };
+
+  // Pass 1: event-surge halos beneath everything.
+  items.forEach(it=>{
+    if(!it.cls.event_pedestrian_flag) return;
+    const emphasised = roleFocus === 'event';
+    L.polyline(it.path, {color: SURGE_COLOR, weight: emphasised ? 17 : 13, opacity: dim(it) ? .1 : (emphasised ? .85 : .6), lineCap:'round'})
+      .addTo(routeLayer);
   });
 
-  Object.keys(geometries).forEach(key=>{
-    const corridor = corridors[key];
-    const cls = STREET_CLASSIFICATION[corridor]; // {type, dominant_mode, mode_counts,
-                                                  // majority_highway, type_confidence, n_votes} or undefined
-    // Parking-lot aisles, driveways, and footways are excluded from street
-    // typing entirely (see classify_corridor_privacy in pathing_pipeline.py),
-    // so they're simply not drawn here rather than shown with a misleading color.
-    if(!showsCorridor(cls)) return;
-
-    const path = geometries[key];
-    const eventOverlay = mode === 'street_type_pedestrian' && cls.event_pedestrian_flag && cls.type !== 'pedestrian_corridor';
-    const color = eventOverlay ? STREET_TYPE_COLORS.event_pedestrian_corridor
-                               : (STREET_TYPE_COLORS[cls.type] || STREET_TYPE_COLORS.unclassified);
+  // Pass 2: the street lines themselves.
+  items.forEach(it=>{
+    const {cls, role, corridor, key} = it;
+    const color = STREET_TYPE_COLORS[role];
     const lowConfidence = cls.type_confidence === 'low' || cls.type === 'insufficient_data';
-    const pct = (v)=> (v === null || v === undefined) ? '–' : Math.round(v*100) + '%';
+    const rel = Math.sqrt((cls.n_votes || 0) / maxByRole[role]);
+    const base = role === 'local_street' ? 3 : 6;
+    const weight = base + (role === 'local_street' ? 2.5 : 3) * rel;
+    const faded = dim(it);
     const eventLine = (cls.baseline_ped_share !== undefined)
       ? (cls.walkin_share !== null && cls.walkin_share !== undefined
-          ? `Walk-in routes (Volume map): ${cls.walkin_trips||0} walking trip${cls.walkin_trips===1?'':'s'} = ${(cls.walkin_share*100).toFixed(1)}% of walking lot-to-stadium trips${cls.also_walkin_route ? ' <b>(arterial that is also a major walk-in route)</b>' : ''}<br>` : '')+
-        `Ordinary-day pedestrian observations: ${cls.ped_obs_ordinary||0} (${pct(cls.baseline_ped_share)} of ${cls.baseline_votes||0}) &nbsp;·&nbsp; event days: ${pct(cls.event_ped_share)} (${cls.event_votes||0} obs.)`+
+          ? `Walk-in routes: ${cls.walkin_trips||0} walking trip${cls.walkin_trips===1?'':'s'} = ${(cls.walkin_share*100).toFixed(1)}% of walking lot-to-stadium trips${cls.also_walkin_route ? ' <b>(arterial that is also a major walk-in route)</b>' : ''}<br>` : '')+
+        `Ordinary-day pedestrian observations: ${cls.ped_obs_ordinary||0} (${pct(cls.baseline_ped_share)} of ${cls.baseline_votes||0})<br>`+
+        `Event days: ${pct(cls.event_ped_share)} (${cls.event_votes||0} obs.)`+
         (cls.event_shift !== null && cls.event_shift !== undefined
-          ? `<br>Event-day shift vs. same-month ordinary days: ${cls.event_shift>=0?'+':''}${(cls.event_shift*100).toFixed(1)} pts${cls.event_pedestrian_flag ? ' <b style="color:#ffb648">(event-day pedestrian surge)</b>' : ''}<br>` : '<br>')
+          ? ` · shift vs. same-month ordinary days: ${cls.event_shift>=0?'+':''}${(cls.event_shift*100).toFixed(1)} pts${cls.event_pedestrian_flag ? ' <b style="background:#ffe94a;padding:0 .2em">event-day surge</b>' : ''}<br>` : '<br>')
       : '';
-    const weight = scaledWeight((cls.n_votes || 0) / maxVotes, {min: 2.5, max: 8, floor: 2.5});
-
-    L.polyline(path, {
-      color, weight, opacity: lowConfidence ? .55 : .9, lineCap:'round',
+    L.polyline(it.path, {
+      color, weight, opacity: faded ? .13 : (lowConfidence ? .6 : .95), lineCap:'round',
       dashArray: lowConfidence ? '6,6' : null,
     })
       .addTo(routeLayer)
       .bindTooltip(
         `<b>${corridor === key ? 'Unnamed Path' : corridor}</b><br>`+
-        `<b style="color:${color}">${STREET_TYPE_LABELS[cls.type] || cls.type}</b>${lowConfidence ? ' <i>(low confidence — small sample or a tied vote)</i>' : ''}<br>`+
+        `<b style="color:${color}">${STREET_TYPE_LABELS[role]}</b>${lowConfidence ? ' <i>(low confidence: small sample)</i>' : ''}<br>`+
         eventLine +
-        `Based on ${cls.n_votes} classified observation${cls.n_votes===1?'':'s'} district-wide on this street<br>`+
-        (cls.majority_highway ? `OSM road type: ${cls.majority_highway}<br>` : '')
+        `Based on ${cls.n_votes} classified observation${cls.n_votes===1?'':'s'} district-wide<br>`+
+        (cls.majority_highway ? `OSM road type: ${cls.majority_highway}` : '')
       );
   });
 
   renderRankedPointsChart();
-  updateColorLegend(maxVotes, mode);
+  updateColorLegend(1, true);
+}
+
+function roleSummary(){
+  const out = {gateway:[], pedestrian_corridor:[], local_street:[], dual:[], event:[]};
+  Object.entries(STREET_CLASSIFICATION).forEach(([name, cls])=>{
+    if(!cls || cls.type === 'excluded_private') return;
+    const role = roleOf(cls);
+    out[role].push(name);
+    if(cls.also_walkin_route && role === 'gateway') out.dual.push(name);
+    if(cls.event_pedestrian_flag) out.event.push(name);
+  });
+  return out;
+}
+function listNames(arr){
+  const a = arr.map(n=>n.replace(/^(West|South|North|East) /,m=>m[0]+' ')); // keep short
+  if(a.length <= 1) return a.join('') || 'none';
+  return a.slice(0,-1).join(', ') + ' and ' + a[a.length-1];
+}
+function fillNarrativeCallouts(){
+  const r = roleSummary();
+  const set = (k, v)=> document.querySelectorAll(`[data-fill="${k}"]`).forEach(el=> el.textContent = v);
+  set('n-gateway', r.gateway.length === 1 ? 'One' : String(r.gateway.length));
+  set('gateway-names', listNames(r.gateway));
+  set('dual-names', r.dual.length ? listNames(r.dual) : 'No arterial');
+  set('ped-names', r.pedestrian_corridor.length ? listNames(r.pedestrian_corridor) : 'no street yet');
+  set('n-local', String(r.local_street.length));
 }
 
 function renderStraightLineFallback(lots){
@@ -1384,7 +1203,7 @@ function renderStraightLineFallback(lots){
     lots.forEach(lot=>{
       const key = lot + '||' + direction;
       (PRIMARY_DATA.flow_lines[key] || []).forEach(line=>{
-        const color = direction === 'to_stadium' ? '#ffb648' : '#a6192e';
+        const color = direction === 'to_stadium' ? '#f2a900' : '#a6192e';
         const weight = scaledWeight(line.device_count / 24, {min: 2.5, max: 7, floor: 2.5});
         const dashClass = direction === 'to_stadium' ? 'flow-to-stadium' : 'flow-from-stadium';
         L.polyline(line.path, {color, weight, opacity:.78, lineCap:'round', className: dashClass})
@@ -1395,35 +1214,35 @@ function renderStraightLineFallback(lots){
   });
 }
 
-function updateColorLegend(maxTotal, streetTypeMode){
+function updateColorLegend(maxTotal, streetRoles){
   const ramp = document.getElementById('legend-ramp');
   const label = document.getElementById('legend-label');
   const minEl = document.getElementById('legend-min');
   const maxEl = document.getElementById('legend-max');
   const minmaxRow = document.getElementById('legend-minmax-row');
   const categorical = document.getElementById('legend-categorical');
+  const flows = document.getElementById('legend-flows');
 
-  if(streetTypeMode){
-    const types = STREET_TYPE_SUBTYPES[streetTypeMode];
-    const isVehicle = streetTypeMode === 'street_type_vehicle';
+  if(streetRoles){
+    const r = roleSummary();
     ramp.style.display = 'none';
     minmaxRow.style.display = 'none';
-    label.textContent = isVehicle
-      ? 'Vehicle streets (gateways vs. local)'
-      : 'Pedestrian streets (heavy walking use)';
+    flows.style.display = 'none';
+    label.textContent = 'Street role (click to isolate)';
     categorical.classList.add('visible');
-    categorical.innerHTML = types.map(t=>
-      `<div class="row"><i class="sw" style="background:${STREET_TYPE_COLORS[t]}"></i>${STREET_TYPE_LABELS[t]}</div>`
-    ).join('') +
-    `<div class="row"><i class="sw dashed" style="color:${STREET_TYPE_COLORS.gateway}"></i>Low confidence (small sample / tie)</div>` +
-    `<div class="note">${isVehicle
-      ? 'Vehicle streets: gateways (arterials) vs. local streets. Parking-lot aisles, driveways, and footways are excluded. Roles use all devices near any district building, not just stadium trips — see "Method" below the map.'
-      : 'Pedestrian streets: non-arterials with heavy walking use, supported by the walk-in routes on the Volume map. Amber = event-day surge (also drawn over any street that shows it). Relative signals from speed between pings, not counted pedestrians.'
-    }</div>`;
+    const row = (role, swClass, color, text)=>
+      `<div class="row ${roleFocus===role?'on':''}" data-role="${role}"><i class="sw ${swClass}" style="background:${color};color:${color}"></i>${text}</div>`;
+    categorical.innerHTML =
+      row('gateway','',STREET_TYPE_COLORS.gateway,`Gateway · ${r.gateway.length}`) +
+      row('pedestrian_corridor','',STREET_TYPE_COLORS.pedestrian_corridor,`Pedestrian street · ${r.pedestrian_corridor.length}`) +
+      row('local_street','',STREET_TYPE_COLORS.local_street,`Local street · ${r.local_street.length}`) +
+      row('event','halo','',`Event-day surge · ${r.event.length}`) +
+      `<div class="note">Dashed = thin data. Roles use all devices near any district building on all days.</div>`;
     return;
   }
   ramp.style.display = '';
   minmaxRow.style.display = '';
+  flows.style.display = '';
   categorical.classList.remove('visible');
 
   if(mapMode === 'volume'){
@@ -1439,6 +1258,25 @@ function updateColorLegend(maxTotal, streetTypeMode){
   }
 }
 
+function updateFilterSummary(lots, residencyFilter, tripCount){
+  const el = document.getElementById('filter-summary');
+  if(!el) return;
+  const parts = [];
+  parts.push(lots.length === allLotNames.length ? 'All lots' : (lots.length === 1 ? lots[0] : lots.length + ' lots'));
+  parts.push(residencyFilter === 'all' ? 'All residents' : (residencyFilter === 'local' ? 'Locals' : 'Visitors'));
+  if(activeDateStart || activeDateEnd) parts.push((activeDateStart||'start') + ' to ' + (activeDateEnd||'end'));
+  else if(activeEventType !== 'all') parts.push(EVENT_TYPE_LABELS[activeEventType]);
+  else parts.push('All dates');
+  parts.push(tripCount.toLocaleString() + ' trips');
+  el.textContent = mapMode === 'street_roles' ? 'Not used by Street Roles' : parts.join(' · ');
+}
+function updateTourPill(){
+  const p = document.getElementById('tour-pill');
+  if(!p) return;
+  p.classList.toggle('paused', manualOverride);
+  p.textContent = manualOverride ? '↺ Resume tour' : '● Guided tour';
+}
+
 function renderMap(lotsInput, residencyFilter){
   routeLayer.clearLayers();
   const lots = (lotsInput === 'all' || !lotsInput.length) ? allLotNames : lotsInput;
@@ -1446,29 +1284,25 @@ function renderMap(lotsInput, residencyFilter){
   document.getElementById('legend-to-stadium').style.opacity = directionFilter === 'from_stadium' ? '.35' : '1';
   document.getElementById('legend-from-stadium').style.opacity = directionFilter === 'to_stadium' ? '.35' : '1';
 
-  const isStreetTypeMode = mapMode === 'street_type_vehicle' || mapMode === 'street_type_pedestrian';
+  const isStreetTypeMode = mapMode === 'street_roles';
   updateModeExplainer();
   if(STREET_MATCH_AVAILABLE){
     document.getElementById('street-match-note').classList.remove('visible');
-    document.getElementById('map-mode-toggle').style.display = 'flex';
+    document.getElementById('map-mode-toggle').style.display = 'inline-flex';
     // The trip-mode filter, top-20 highlight, and share-of-trips toggle all
     // operate on the lot-trip population/stats that Volume and Residency
     // use -- they don't apply to the Street Type exhibits, which already
     // split by mode internally and scale against their own vote counts
     // rather than a shared trip total, so hide them rather than let them
     // silently do nothing (or worse, look like they're filtering).
-    document.getElementById('mode-filter-toggle').style.display = isStreetTypeMode ? 'none' : 'flex';
-    document.getElementById('top20-toggle').style.display = isStreetTypeMode ? 'none' : 'block';
-    document.getElementById('share-mode-toggle').style.display = isStreetTypeMode ? 'none' : 'block';
+    document.getElementById('walkin-controls').style.display = isStreetTypeMode ? 'none' : 'flex';
     document.getElementById('color-legend').style.display = 'block';
     renderStreetSegments(lots, residencyFilter);
   } else {
     document.getElementById('street-match-note').classList.add('visible');
     document.getElementById('map-mode-toggle').style.display = 'none';
-    document.getElementById('mode-filter-toggle').style.display = 'none';
+    document.getElementById('walkin-controls').style.display = 'none';
     document.getElementById('color-legend').style.display = 'none';
-    document.getElementById('top20-toggle').style.display = 'none';
-    document.getElementById('share-mode-toggle').style.display = 'none';
     renderStraightLineFallback(lots);
     renderRankedPointsChart();
   }
@@ -1492,6 +1326,9 @@ function renderMap(lotsInput, residencyFilter){
   document.getElementById('hud-res').textContent = totalCount
     ? Math.round(100*localCount/totalCount)+'% / '+Math.round(100*visitorCount/totalCount)+'%'
     : '–';
+
+  updateFilterSummary(lots, residencyFilter, totalCount);
+  updateTourPill();
 
   allLotNames.forEach(lot=>{
     const active = lots.includes(lot);
@@ -1550,7 +1387,7 @@ function renderExtrapolationChart(selectedLots){
     type: 'bar',
     data: {
       labels: rows.map(r => r.lot),
-      datasets: [{ data: rows.map(r => r.estimated_actual_devices), backgroundColor: '#3ec9a7' }]
+      datasets: [{ data: rows.map(r => r.estimated_actual_devices), backgroundColor: '#13a389' }]
     },
     options: {
       indexAxis: 'y',
@@ -1562,8 +1399,8 @@ function renderExtrapolationChart(selectedLots){
         }}}
       },
       scales: {
-        x: { ticks: { color: '#c9cdd6', font: { size: 9 }, callback: (v) => v >= 1000 ? (v/1000)+'k' : v }, grid: { color: '#2a2e38' } },
-        y: { ticks: { color: '#c9cdd6', font: { size: 9 } }, grid: { display: false } }
+        x: { ticks: { color: '#3b3a35', font: { size: 9 }, callback: (v) => v >= 1000 ? (v/1000)+'k' : v }, grid: { color: '#e6e1d0' } },
+        y: { ticks: { color: '#3b3a35', font: { size: 9 } }, grid: { display: false } }
       },
       responsive: true, maintainAspectRatio: false,
     }
@@ -1591,8 +1428,8 @@ function renderDeviceChart(selectedLots){
         }}}
       },
       scales:{
-        x:{ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> v>=1000 ? (v/1000)+'k' : v}, grid:{color:'#2a2e38'}},
-        y:{ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+        x:{ticks:{color:'#3b3a35',font:{size:9}, callback:(v)=> v>=1000 ? (v/1000)+'k' : v}, grid:{color:'#e6e1d0'}},
+        y:{ticks:{color:'#3b3a35',font:{size:9}}, grid:{display:false}}
       },
       responsive:true, maintainAspectRatio:false
     }
@@ -1610,17 +1447,17 @@ function renderResidencyChart(selectedLots){
     data:{
       labels: rows.map(r=>r.lot),
       datasets:[
-        {label:'Local', data: rows.map(r=>r.local_pct), backgroundColor:'#3ec9a7'},
-        {label:'Visitor', data: rows.map(r=>r.visitor_pct), backgroundColor:'#b98cf2'},
-        {label:'Unknown', data: rows.map(r=>r.unknown_pct), backgroundColor:'#4a4f5c'},
+        {label:'Local', data: rows.map(r=>r.local_pct), backgroundColor:'#13a389'},
+        {label:'Visitor', data: rows.map(r=>r.visitor_pct), backgroundColor:'#7a5cd6'},
+        {label:'Unknown', data: rows.map(r=>r.unknown_pct), backgroundColor:'#c4c0b0'},
       ]
     },
     options:{
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}}},
+      plugins:{legend:{position:'top', labels:{color:'#3b3a35', font:{size:9}, boxWidth:10}}},
       scales:{
-        x:{stacked:true, max:100, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{color:'#2a2e38'}},
-        y:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}}, grid:{display:false}}
+        x:{stacked:true, max:100, ticks:{color:'#3b3a35',font:{size:9}}, grid:{color:'#e6e1d0'}},
+        y:{stacked:true, ticks:{color:'#3b3a35',font:{size:9}}, grid:{display:false}}
       }
     }
   };
@@ -1652,7 +1489,7 @@ function renderRankedPointsChart(){
       type:'bar',
       data:{
         labels: ranked.map(e=> e.corridor.length > 18 ? e.corridor.slice(0,17)+'…' : e.corridor),
-        datasets:[{ data: ranked.map(e=> shareMode ? 100*e.total/lastTotalLegs : scaledCount(e.total)), backgroundColor: '#ffb648' }]
+        datasets:[{ data: ranked.map(e=> shareMode ? 100*e.total/lastTotalLegs : scaledCount(e.total)), backgroundColor: '#f2a900' }]
       },
       options:{
         indexAxis:'y', plugins:{legend:{display:false},
@@ -1665,8 +1502,8 @@ function renderRankedPointsChart(){
           }}
         },
         scales:{
-          x:{ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#2a2e38'}},
-          y:{ticks:{color:'#c9cdd6',font:{size:8}}, grid:{display:false}}
+          x:{ticks:{color:'#3b3a35',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#e6e1d0'}},
+          y:{ticks:{color:'#3b3a35',font:{size:8}}, grid:{display:false}}
         },
         responsive:true, maintainAspectRatio:false,
         onClick:(evt, elements)=>{
@@ -1700,15 +1537,15 @@ function renderRankedPointsChart(){
     data:{
       labels: points.map(e=> e.corridor.length > 18 ? e.corridor.slice(0,17)+'…' : e.corridor),
       datasets:[
-        {label:'Local', data: points.map(e=>asVal(e.local)), backgroundColor:'#3ec9a7'},
-        {label:'Visitor', data: points.map(e=>asVal(e.visitor)), backgroundColor:'#b98cf2'},
-        {label:'Unknown', data: points.map(e=>asVal(e.unknown)), backgroundColor:'#4a4f5c'},
+        {label:'Local', data: points.map(e=>asVal(e.local)), backgroundColor:'#13a389'},
+        {label:'Visitor', data: points.map(e=>asVal(e.visitor)), backgroundColor:'#7a5cd6'},
+        {label:'Unknown', data: points.map(e=>asVal(e.unknown)), backgroundColor:'#c4c0b0'},
       ]
     },
     options:{
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{
-        legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}},
+        legend:{position:'top', labels:{color:'#3b3a35', font:{size:9}, boxWidth:10}},
         tooltip:{callbacks:{
           title: (items)=> points[items[0].dataIndex].corridor,
           label: (ctx)=>{
@@ -1719,8 +1556,8 @@ function renderRankedPointsChart(){
         }}
       },
       scales:{
-        x:{stacked:true, ticks:{color:'#c9cdd6',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#2a2e38'}},
-        y:{stacked:true, ticks:{color:'#c9cdd6',font:{size:8}}, grid:{display:false}}
+        x:{stacked:true, ticks:{color:'#3b3a35',font:{size:9}, callback:(v)=> shareMode ? v+'%' : v}, grid:{color:'#e6e1d0'}},
+        y:{stacked:true, ticks:{color:'#3b3a35',font:{size:8}}, grid:{display:false}}
       },
       onClick:(evt, elements)=>{
         if(!elements.length) return;
@@ -1765,12 +1602,12 @@ function renderHistogramChart(selectedLots, residencyFilter){
     data:{ labels, datasets: datasets.map(d=>({label:d.label, data:d.data, backgroundColor:d.backgroundColor})) },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display: events.length>1, position:'top', labels:{color:'#c9cdd6', font:{size:9}}}},
+      plugins:{legend:{display: events.length>1, position:'top', labels:{color:'#3b3a35', font:{size:9}}}},
       scales:{
-        x:{title:{display:true, text:'Minutes to stadium', color:'#7d8394', font:{size:9}},
-           ticks:{color:'#7d8394',font:{size:8}}, grid:{display:false}},
-        y:{title:{display:true, text:'Devices', color:'#7d8394', font:{size:9}},
-           ticks:{color:'#7d8394',font:{size:9}}, grid:{color:'#2a2e38'}}
+        x:{title:{display:true, text:'Minutes to stadium', color:'#6f6a5c', font:{size:9}},
+           ticks:{color:'#6f6a5c',font:{size:8}}, grid:{display:false}},
+        y:{title:{display:true, text:'Devices', color:'#6f6a5c', font:{size:9}},
+           ticks:{color:'#6f6a5c',font:{size:9}}, grid:{color:'#e6e1d0'}}
       }
     }
   };
@@ -1809,17 +1646,17 @@ function renderTimeOfDayChart(selectedLots, residencyFilter){
     data:{
       labels,
       datasets:[
-        {label:'Arriving (to stadium)', data: toCounts, backgroundColor:'#ffb648'},
+        {label:'Arriving (to stadium)', data: toCounts, backgroundColor:'#f2a900'},
         {label:'Leaving (from stadium)', data: fromCounts, backgroundColor:'#a6192e'},
       ]
     },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'top', labels:{color:'#c9cdd6', font:{size:9}, boxWidth:10}}},
+      plugins:{legend:{position:'top', labels:{color:'#3b3a35', font:{size:9}, boxWidth:10}}},
       scales:{
-        x:{ticks:{color:'#7d8394',font:{size:8}, maxRotation:0, autoSkip:true, maxTicksLimit:12}, grid:{display:false}},
-        y:{title:{display:true, text:'Devices', color:'#7d8394', font:{size:9}},
-           ticks:{color:'#7d8394',font:{size:9}}, grid:{color:'#2a2e38'}}
+        x:{ticks:{color:'#6f6a5c',font:{size:8}, maxRotation:0, autoSkip:true, maxTicksLimit:12}, grid:{display:false}},
+        y:{title:{display:true, text:'Devices', color:'#6f6a5c', font:{size:9}},
+           ticks:{color:'#6f6a5c',font:{size:9}}, grid:{color:'#e6e1d0'}}
       }
     }
   };
@@ -1837,7 +1674,7 @@ function renderTimeOfDayChart(selectedLots, residencyFilter){
 function paintChip(chip, on){
   chip.classList.toggle('active', on);
   chip.style.background = on ? LOT_COLORS[chip.dataset.lot] : 'var(--panel)';
-  chip.style.color = on ? '#0c0d10' : 'var(--silver)';
+  chip.style.color = on ? '#17160f' : 'var(--ink-2)';
 }
 
 const lotToggleContainer = document.getElementById('lot-toggles');
@@ -1961,8 +1798,8 @@ document.querySelectorAll('.res-btn').forEach(btn=>{
   });
 });
 
-document.querySelectorAll('.hl[data-lot]').forEach(span=>{
-  span.style.background = LOT_COLORS[span.dataset.lot] || 'var(--torch-amber)';
+document.querySelectorAll('.lot-link[data-lot]').forEach(span=>{
+  span.style.background = 'linear-gradient(transparent 52%,' + (LOT_COLORS[span.dataset.lot] || '#ffe94a') + ' 52%,' + (LOT_COLORS[span.dataset.lot] || '#ffe94a') + ' 92%,transparent 92%)';
   span.addEventListener('click', ()=>{
     manualOverride = true;
     document.getElementById('override-note').classList.add('visible');
@@ -1971,17 +1808,30 @@ document.querySelectorAll('.hl[data-lot]').forEach(span=>{
     renderMap([span.dataset.lot], activeResidency);
   });
 });
-document.querySelectorAll('.hl[data-res]').forEach(span=>{
-  span.style.background = span.dataset.res === 'local' ? 'var(--local-teal)' : 'var(--visitor-violet)';
-});
-
+function setMapMode(mode){
+  mapMode = mode;
+  document.querySelectorAll('#map-mode-toggle button').forEach(b=>b.classList.toggle('active', b.dataset.mode === mode));
+}
 document.querySelectorAll('#map-mode-toggle button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#map-mode-toggle button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    mapMode = btn.dataset.mode;
+    manualOverride = true;
+    document.getElementById('override-note').classList.add('visible');
+    roleFocus = null;
+    setMapMode(btn.dataset.mode);
     renderMap([...activeLots], activeResidency);
   });
+});
+// click a legend row in Street Roles to isolate that role
+document.getElementById('color-legend').addEventListener('click', (e)=>{
+  const row = e.target.closest('.row[data-role]');
+  if(!row || mapMode !== 'street_roles') return;
+  manualOverride = true;
+  document.getElementById('override-note').classList.add('visible');
+  roleFocus = (roleFocus === row.dataset.role) ? null : row.dataset.role;
+  renderMap([...activeLots], activeResidency);
+});
+document.getElementById('open-filters-btn').addEventListener('click', ()=>{
+  const f = document.getElementById('filters'); f.open = true;
 });
 
 document.querySelectorAll('#ranking-mode-toggle button').forEach(btn=>{
@@ -1996,14 +1846,14 @@ document.querySelectorAll('#ranking-mode-toggle button').forEach(btn=>{
 document.getElementById('top20-toggle').addEventListener('click', (e)=>{
   top20Highlight = !top20Highlight;
   e.target.classList.toggle('active', top20Highlight);
-  e.target.textContent = (top20Highlight ? '★' : '☆') + ' Highlight top 20 busiest streets';
+  e.target.textContent = (top20Highlight ? '★' : '☆') + ' Top 20 streets';
   renderMap([...activeLots], activeResidency);
 });
 
 document.getElementById('share-mode-toggle').addEventListener('click', (e)=>{
   shareMode = !shareMode;
   e.target.classList.toggle('active', shareMode);
-  e.target.textContent = (shareMode ? '#' : '%') + (shareMode ? ' Show as device count' : ' Show as share of trips');
+  e.target.textContent = (shareMode ? '#' : '%') + (shareMode ? ' Device count' : ' Share of trips');
   renderMap([...activeLots], activeResidency);
 });
 
@@ -2026,7 +1876,7 @@ document.querySelectorAll('#mode-filter-toggle button').forEach(btn=>{
 });
 
 document.getElementById('fullscreen-toggle').addEventListener('click', ()=>{
-  const mapZone = document.querySelector('.map-zone');
+  const mapZone = document.getElementById('story-map');
   if(!document.fullscreenElement){
     mapZone.requestFullscreen().catch(err=>console.warn('Fullscreen request failed:', err));
   } else {
@@ -2036,7 +1886,7 @@ document.getElementById('fullscreen-toggle').addEventListener('click', ()=>{
 document.addEventListener('fullscreenchange', ()=>{
   const btn = document.getElementById('fullscreen-toggle');
   const isFs = !!document.fullscreenElement;
-  btn.textContent = isFs ? '⤢ Exit fullscreen' : '⛶ Fullscreen';
+  btn.textContent = isFs ? '⤢ Exit' : '⛶ Fullscreen';
   // Leaflet needs to recompute its size after the container's actual
   // on-screen dimensions change; a short delay lets the fullscreen
   // transition finish first.
@@ -2046,7 +1896,7 @@ document.addEventListener('fullscreenchange', ()=>{
 document.getElementById('flow-pause-toggle').addEventListener('click', (e)=>{
   const mapZone = document.querySelector('.map-zone');
   const paused = mapZone.classList.toggle('flow-paused');
-  e.target.textContent = paused ? '▶ Resume flow animation' : '⏸ Pause flow animation';
+  e.target.textContent = paused ? '▶ Resume flow' : '⏸ Pause flow';
 });
 
 document.querySelectorAll('#bin-toggle button').forEach(btn=>{
@@ -2098,28 +1948,42 @@ document.getElementById('event-file-input').addEventListener('change', async (e)
 /* SCROLLYTELLING (paused once the user manually sets filters)       */
 /* ============================================================== */
 const steps = document.querySelectorAll('.step');
+let currentStep = steps[0] || null;
+function applyStep(stepEl){
+  const lotsAttr = stepEl.dataset.lots || 'all';
+  const resAttr = stepEl.dataset.residency || 'all';
+  const lots = lotsAttr === 'all' ? allLotNames : [lotsAttr];
+  activeLots = new Set(lots);
+  document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, activeLots.has(c.dataset.lot)));
+  activeResidency = resAttr;
+  document.querySelectorAll('.res-btn').forEach(b=>b.classList.toggle('active', b.dataset.res===resAttr));
+  setMapMode(stepEl.dataset.mode || 'volume');
+  roleFocus = stepEl.dataset.role ? stepEl.dataset.role : null;
+  renderMap(lots, resAttr);
+}
 const stepObserver = new IntersectionObserver((entries)=>{
   entries.forEach(entry=>{
-    if(entry.isIntersecting){
-      steps.forEach(s=>s.classList.remove('is-active'));
-      entry.target.classList.add('is-active');
-      if(manualOverride) return; // don't fight the user's own selection
-      const lotsAttr = entry.target.dataset.lots;
-      const resAttr = entry.target.dataset.residency || 'all';
-      const lots = lotsAttr === 'all' ? allLotNames : [lotsAttr];
-      activeLots = new Set(lots);
-      document.querySelectorAll('.lot-chip').forEach(c=>paintChip(c, activeLots.has(c.dataset.lot)));
-      activeResidency = resAttr;
-      document.querySelectorAll('.res-btn').forEach(b=>b.classList.toggle('active', b.dataset.res===resAttr));
-      renderMap(lots, resAttr);
-    }
+    if(!entry.isIntersecting) return;
+    steps.forEach(s=>s.classList.remove('is-active'));
+    entry.target.classList.add('is-active');
+    currentStep = entry.target;
+    if(manualOverride) return; // don't fight the user's own selection
+    applyStep(entry.target);
   });
-}, {root:null, threshold:0.55});
+}, {root:null, rootMargin:'-38% 0px -42% 0px', threshold:0});
 steps.forEach(s=>stepObserver.observe(s));
+document.getElementById('tour-pill').addEventListener('click', ()=>{
+  if(!manualOverride) return;
+  manualOverride = false;
+  document.getElementById('override-note').classList.remove('visible');
+  if(currentStep) applyStep(currentStep);
+});
 
 /* ============================================================== */
 /* INITIAL RENDER                                                    */
 /* ============================================================== */
+fillNarrativeCallouts();
+steps[0] && steps[0].classList.add('is-active');
 renderMap('all', 'all');
 </script>
 </body>
