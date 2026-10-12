@@ -1,0 +1,111 @@
+{
+  "available": true,
+  "n_distinct_dates": 640,
+  "total_device_date_rows": 902880,
+  "top_20_busiest_dates": [
+    {
+      "date": "2025-05-04",
+      "devices": 5192,
+      "matched_event": null
+    },
+    {
+      "date": "2025-10-12",
+      "devices": 4952,
+      "matched_event": "Raiders vs. Titans"
+    },
+    {
+      "date": "2025-11-23",
+      "devices": 4770,
+      "matched_event": "Raiders vs. Browns"
+    },
+    {
+      "date": "2025-05-05",
+      "devices": 4578,
+      "matched_event": null
+    },
+    {
+      "date": "2025-09-28",
+      "devices": 4560,
+      "matched_event": "Raiders vs. Bears"
+    },
+    {
+      "date": "2025-07-10",
+      "devices": 4299,
+      "matched_event": null
+    },
+    {
+      "date": "2025-11-01",
+      "devices": 4256,
+      "matched_event": "UNLV vs. New Mexico"
+    },
+    {
+      "date": "2025-06-16",
+      "devices": 4148,
+      "matched_event": null
+    },
+    {
+      "date": "2025-11-15",
+      "devices": 4126,
+      "matched_event": "UNLV vs. Utah State"
+    },
+    {
+      "date": "2025-10-19",
+      "devices": 4052,
+      "matched_event": null
+    },
+    {
+      "date": "2025-05-01",
+      "devices": 4045,
+      "matched_event": null
+    },
+    {
+      "date": "2025-09-21",
+      "devices": 3999,
+      "matched_event": null
+    },
+    {
+      "date": "2025-06-26",
+      "devices": 3987,
+      "matched_event": null
+    },
+    {
+      "date": "2025-10-20",
+      "devices": 3945,
+      "matched_event": null
+    },
+    {
+      "date": "2025-10-10",
+      "devices": 3937,
+      "matched_event": null
+    },
+    {
+      "date": "2025-11-18",
+      "devices": 3925,
+      "matched_event": null
+    },
+    {
+      "date": "2025-05-08",
+      "devices": 3924,
+      "matched_event": null
+    },
+    {
+      "date": "2025-07-11",
+      "devices": 3869,
+      "matched_event": null
+    },
+    {
+      "date": "2025-07-03",
+      "devices": 3799,
+      "matched_event": null
+    },
+    {
+      "date": "2025-11-17",
+      "devices": 3797,
+      "matched_event": "Raiders vs. Cowboys"
+    }
+  ],
+  "event_dates_matched": 38,
+  "mean_devices_per_event_date": 2490.9,
+  "mean_devices_per_non_event_date": 1342.6,
+  "pct_of_device_days_on_event_dates": 10.5
+}

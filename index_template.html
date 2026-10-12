@@ -341,6 +341,27 @@ h1.title em{font-style:normal;color:var(--allegiant-red);}
 .event-chip .swatch-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:.4rem;}
 
 /* ---------------------------------------------------------------- */
+/* MAP EXPLAINER + METHOD SECTION                                      */
+/* ---------------------------------------------------------------- */
+.mode-explainer{
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:var(--night-navy);padding:.7rem 1rem;font-size:.8rem;line-height:1.45;color:var(--silver);
+}
+.mode-explainer b{color:var(--paper);}
+.mode-explainer .me-title{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--torch-amber);display:block;margin-bottom:.2rem;}
+.method{max-width:1000px;margin:0 auto;padding:7vh 6vw 3vh;}
+.method h2{font-family:var(--display);font-size:1.7rem;margin:0 0 .4rem;color:var(--paper);}
+.method .lede{color:var(--silver);max-width:70ch;}
+.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.2rem 0;}
+.method-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.1rem;font-size:.9rem;line-height:1.5;color:var(--silver);}
+.method-card h3{font-family:var(--display);font-size:1.05rem;margin:0 0 .4rem;color:var(--paper);}
+.method-card .tag{font-family:var(--mono);font-size:.65rem;color:var(--torch-amber);letter-spacing:.06em;text-transform:uppercase;}
+.method details{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.7rem 1.1rem;margin:.6rem 0;font-size:.9rem;line-height:1.5;color:var(--silver);}
+.method summary{cursor:pointer;color:var(--paper);font-family:var(--display);font-size:1rem;}
+.method details ul{margin:.5rem 0 .2rem 1.1rem;padding:0;}
+@media (max-width:900px){.method-grid{grid-template-columns:1fr;}}
+
+/* ---------------------------------------------------------------- */
 /* FOOTNOTE                                                           */
 /* ---------------------------------------------------------------- */
 footer{
@@ -438,7 +459,8 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
       <div class="map-mode-toggle" id="map-mode-toggle">
         <button data-mode="volume" class="active">Volume</button>
         <button data-mode="residency">Local vs. Visitor</button>
-        <button data-mode="street_type">Street Type</button>
+        <button data-mode="street_type_vehicle">Street Type: Vehicle</button>
+        <button data-mode="street_type_pedestrian">Street Type: Pedestrian</button>
       </div>
       <button class="map-icon-btn" id="top20-toggle" style="position:absolute;top:3.1rem;right:.8rem;z-index:500;">☆ Highlight top 20 busiest streets</button>
       <button class="map-icon-btn" id="share-mode-toggle" style="position:absolute;top:5.4rem;right:.8rem;z-index:500;">% Show as share of trips</button>
@@ -466,6 +488,8 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
         <span id="legend-from-stadium"><i class="swatch" style="background:var(--allegiant-red)"></i>Flow from stadium</span>
       </div>
     </div>
+
+    <div class="mode-explainer" id="mode-explainer"></div>
 
     <div class="panel-scroll">
       <h4>Date range</h4>
@@ -553,6 +577,92 @@ footer code{background:var(--panel);padding:.1em .4em;border-radius:3px;font-fam
   </div>
 </section>
 
+<section class="method" id="method">
+  <p class="eyebrow">Method — how to read this page</p>
+  <h2>Two analyses, two different questions</h2>
+  <p class="lede">This page answers two separate questions with two separate
+    sets of devices. Mixing them up is the easiest way to misread the maps,
+    so they are kept apart on purpose.</p>
+
+  <div class="method-grid">
+    <div class="method-card">
+      <span class="tag">Maps 1–2 · Volume, Local vs. Visitor</span>
+      <h3>The walk in from parking</h3>
+      <p><b>Question:</b> which streets do people use to get from a parking
+        lot to the stadium, and how long does it take?</p>
+      <p><b>Population:</b> only devices seen in a mapped parking lot and then
+        at the stadium. Because it is anchored to stadium visits, it mostly
+        reflects <b>event days</b> and pedestrians.</p>
+    </div>
+    <div class="method-card">
+      <span class="tag">Maps 3–4 · Street Type</span>
+      <h3>How the district's streets are used</h3>
+      <p><b>Question:</b> which streets are vehicle gateways, which are
+        pedestrian corridors, and which are local access streets?</p>
+      <p><b>Population:</b> every device seen near <i>any</i> building in the
+        district over the whole data period (a broader extract that includes
+        ordinary, non-event days), so vehicle traffic is not drowned out by
+        event-day crowds.</p>
+    </div>
+  </div>
+
+  <details open>
+    <summary>Why two populations? (the skew we found)</summary>
+    <p>The first street typing used only stadium-anchored trips and labeled
+      almost every street a pedestrian corridor, even major roads like Dean
+      Martin Drive and Tropicana Avenue. We checked the data: event dates were
+      about 42% of device-days in that extract, with roughly 5× the activity
+      of other days. A broader district-wide extract cut event dates to about
+      10% of device-days, and the major arterials then came out as gateways.</p>
+  </details>
+
+  <details>
+    <summary>How streets are typed</summary>
+    <ul>
+      <li><b>Gateway</b> — a major road (OpenStreetMap primary / secondary /
+        tertiary) where vehicle travel dominates.</li>
+      <li><b>Pedestrian corridor</b> — a non-gateway street where, on ordinary
+        (non-event) days, at least half of classified observations look like
+        walking or standing, with enough data to trust it.</li>
+      <li><b>Event-day pedestrian corridor</b> — pedestrian share jumps at
+        least 10 points on event days compared with ordinary days <i>from the
+        same months</i>, and reaches at least 50%.</li>
+      <li><b>Local street</b> — everything else with enough data. Streets with
+        too little routine data are shown grey as <b>insufficient data</b>.</li>
+      <li>Parking-lot aisles, driveways and footways are left out; only
+        real public streets are typed.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>How event days are handled (without letting them skew the result)</summary>
+    <p>Each street's label comes from <b>non-event days only</b>, so a crowded
+      game day cannot turn a road into a "pedestrian street." Event days are
+      reported separately as a flag. The event comparison uses ordinary days
+      from the <b>same months</b>, because GPS ping frequency varies a lot by
+      month (median gap of about 3 seconds in early 2025 versus about 40
+      seconds in summer 2025), which would otherwise look like an event effect.</p>
+  </details>
+
+  <details>
+    <summary>Limits to keep in mind</summary>
+    <ul>
+      <li>Travel mode is inferred from speed between GPS pings, which is
+        imprecise when pings are sparse. Slow or stop-and-go cars near the
+        Strip can look like bikes; for street typing we count "biking" as
+        vehicle traffic.</li>
+      <li>The shares are <b>relative rankings</b>, not measured pedestrian
+        counts. Even the busiest arterials read only about 60–65% vehicle.</li>
+      <li>Streets with few observations are marked insufficient data or low
+        confidence rather than forced into a category.</li>
+      <li>Census commute-mode data for the district's block group (about 623
+        workers) was reviewed as a plausibility check only; it describes
+        residents, not people who work in the district.</li>
+    </ul>
+  </details>
+  <p class="chart-note">Full methodology, thresholds and code are in the repository README.</p>
+</section>
+
 <footer>
   <p><b>Methodology.</b> Trips are reconstructed from an Azira Pinnacle
     Pathing X export, with stadium arrival independently confirmed by a Pin
@@ -587,8 +697,16 @@ const EDGE_CORRIDORS_RAW = __EDGE_CORRIDORS__; // {canonical_edge_key: corridor_
 const EXTRAPOLATION_CALIBRATION = __EXTRAPOLATION_CALIBRATION__; // {} if not available for this run
 const STREET_CLASSIFICATION = __STREET_CLASSIFICATION__; // {corridor: {type, dominant_mode, mode_counts,
   // majority_highway, type_confidence, n_votes}} or {} if this run didn't use --street-match, or predates
-  // street-type classification -- the "Street Type" map mode and mode filter below both degrade gracefully
+  // street-type classification -- the "Street Type" map modes below both degrade gracefully
   // (falls back to showing every corridor as "unclassified") when this is empty.
+// Street-type classification is built from a DIFFERENT, broader trip population than every
+// other map mode (see build_district_trajectory_legs in pathing_pipeline.py) -- every device
+// connected to a stadium visit, not just the ones who pinged inside a mapped parking lot. That
+// means the edge geometry/corridor keys it was computed against are their own separate files,
+// not EDGE_GEOMETRIES/EDGE_CORRIDORS_RAW above (those stay lot-trip-only, used by Volume/Residency).
+// Falls back to the lot-trip edge files if a run predates this split (older exports only have one set).
+const STREET_TYPE_EDGE_GEOMETRIES = __STREET_TYPE_EDGE_GEOMETRIES__; // {} -> falls back below
+const STREET_TYPE_EDGE_CORRIDORS_RAW = __STREET_TYPE_EDGE_CORRIDORS__; // {} -> falls back below
 // Merge divided/parallel carriageways of the same named street into one
 // corridor for counting, so volume isn't diluted across each individual
 // OSM lane-edge -- falls back to "each edge is its own corridor" if this
@@ -602,6 +720,17 @@ Object.entries(EDGE_CORRIDORS).forEach(([edgeKey, corridor])=>{
   (CORRIDOR_TO_EDGES[corridor] = CORRIDOR_TO_EDGES[corridor] || []).push(edgeKey);
 });
 const STREET_MATCH_AVAILABLE = PRIMARY_DATA.routes.length > 0 && PRIMARY_DATA.routes[0].hasOwnProperty('matched_edges') && Object.keys(EDGE_GEOMETRIES).length > 0;
+
+// Same merge, but for the separate district-wide edge set STREET_CLASSIFICATION was
+// actually computed against -- falls back to the lot-trip edge set above when a run
+// predates the split (so older exports still render a (less complete) Street Type view).
+const STREET_TYPE_HAS_OWN_EDGES = Object.keys(STREET_TYPE_EDGE_GEOMETRIES).length > 0;
+const EFFECTIVE_STREET_TYPE_GEOMETRIES = STREET_TYPE_HAS_OWN_EDGES ? STREET_TYPE_EDGE_GEOMETRIES : EDGE_GEOMETRIES;
+const EFFECTIVE_STREET_TYPE_CORRIDORS_RAW = STREET_TYPE_HAS_OWN_EDGES ? STREET_TYPE_EDGE_CORRIDORS_RAW : EDGE_CORRIDORS_RAW;
+const STREET_TYPE_EDGE_CORRIDORS = {};
+Object.keys(EFFECTIVE_STREET_TYPE_GEOMETRIES).forEach(key=>{
+  STREET_TYPE_EDGE_CORRIDORS[key] = EFFECTIVE_STREET_TYPE_CORRIDORS_RAW[key] || key;
+});
 
 const events = [{
   id: "primary",
@@ -916,7 +1045,13 @@ function median(arr){
   return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 
-let mapMode = 'volume'; // 'volume' | 'residency'
+let mapMode = 'volume'; // 'volume' | 'residency' | 'street_type_vehicle' | 'street_type_pedestrian'
+// The two street_type_* modes are a deliberately separate exhibit pair: vehicle streets
+// (gateway vs. local_street) and pedestrian corridors have very different trip-count
+// magnitudes, so sharing one volume/weight scale between them would wash the smaller
+// one out entirely. Each is scaled only against the max within its own subset (see
+// renderStreetTypeSegments). unclassified corridors render in whichever exhibit mode is
+// active when touched, scaled with that mode's own max.
 let rankingMode = 'entry'; // 'entry' | 'exit' | 'top20' -- drives the ranked chart below the map
 let top20Highlight = false; // white-halo outline on the map for the 20 busiest corridors
 let shareMode = false; // show % of filtered trips instead of raw device counts -- more
@@ -935,15 +1070,35 @@ let modeFilter = 'all'; // 'all' | 'walking' | 'biking' | 'car' -- restricts eve
 const STREET_TYPE_COLORS = {
   gateway: '#e0664a',
   pedestrian_corridor: '#3ec9a7',
+  event_pedestrian_corridor: '#ffb648',
   local_street: '#b98cf2',
   unclassified: '#6b7280',
+  insufficient_data: '#6b7280',
 };
 const STREET_TYPE_LABELS = {
   gateway: 'Gateway (major road, vehicle-dominant)',
-  pedestrian_corridor: 'Pedestrian corridor',
+  pedestrian_corridor: 'Pedestrian corridor (routine)',
+  event_pedestrian_corridor: 'Event-day pedestrian corridor',
   local_street: 'Local street (vehicle-dominant)',
   unclassified: 'Unclassified (no mode data)',
+  insufficient_data: 'Insufficient data',
 };
+const MODE_EXPLAINERS = {
+  volume: ['Volume — the walk in from parking',
+    'Each line is a real street segment; color and thickness show how many devices used it between a mapped parking lot and the stadium. Built from stadium-anchored trips, so it mostly reflects <b>event days</b> and walkers. It answers "which routes do fans use?", not "how are streets used day to day?"'],
+  residency: ['Local vs. Visitor — who uses which route',
+    'Same stadium-anchored trips as Volume, colored by whether the device\'s common evening location is in the Las Vegas metro (local) or elsewhere (visitor). Event-day population, walk-in routes only.'],
+  street_type_vehicle: ['Street Type: Vehicle — gateways and local streets',
+    'Built from a broader district-wide extract (all devices near any district building, all days), <b>not</b> just stadium trips. Gateways are major roads where vehicle travel dominates; local streets are the rest. Labels use ordinary (non-event) days only; "biking" is counted as vehicle traffic because slow cars near the Strip read as bikes. Grey = too little data.'],
+  street_type_pedestrian: ['Street Type: Pedestrian — routine vs. event-day corridors',
+    'Same district-wide extract. Teal streets are pedestrian-heavy on ordinary days. Amber streets (and gateways flagged amber) jump at least 10 points toward walking on event days versus ordinary days <b>from the same months</b>. Shares are relative rankings from speed between GPS pings, not counted pedestrians.'],
+};
+function updateModeExplainer(){
+  const el = document.getElementById('mode-explainer');
+  if(!el) return;
+  const e = MODE_EXPLAINERS[mapMode] || MODE_EXPLAINERS.volume;
+  el.innerHTML = '<span class="me-title">' + e[0] + '</span>' + e[1];
+}
 let lastEntryPoints = [];
 let lastExitPoints = [];
 let lastCorridorStats = new Map();
@@ -977,7 +1132,23 @@ function fmtCount(n, total){
   return fmtNumber(scaledCount(n));
 }
 
+// Perceptual line-weight scale shared by every map mode. A straight linear
+// scale against the busiest corridor's count (the old formula) makes nearly
+// everything else render at or near the floor whenever one corridor dominates
+// the rest -- sqrt compresses that gap so mid-volume streets stay visible,
+// and the floor/ceiling are both raised so even the quietest drawn corridor
+// reads as a real line on a crowded street map, not a hairline.
+function scaledWeight(fraction, {min = 2.5, max = 9, floor = 2.5} = {}){
+  const f = Math.max(0, Math.min(1, fraction || 0));
+  return Math.max(floor, Math.min(max, min + (max - min) * Math.sqrt(f)));
+}
+
 function renderStreetSegments(lots, residencyFilter){
+  if(mapMode === 'street_type_vehicle' || mapMode === 'street_type_pedestrian'){
+    renderStreetTypeSegments(mapMode);
+    return;
+  }
+
   const {
     touchedEdges, edgeDir, corridorStats, entryPoints, exitPoints, corridorBounds,
     totalFilteredLegs, totalFilteredToStadium, totalFilteredFromStadium,
@@ -1000,28 +1171,16 @@ function renderStreetSegments(lots, residencyFilter){
     if(!cs) return;
     const path = EDGE_GEOMETRIES[key];
     const dir = edgeDir.get(key) || {to_count:0, from_count:0};
-    const cls = STREET_CLASSIFICATION[corridor]; // {type, dominant_mode, mode_counts,
-                                                  // majority_highway, type_confidence, n_votes} or undefined
 
-    // Street Type mode only shows real public streets (gateway/pedestrian/
-    // local/unclassified) -- parking-lot aisles, driveways, and footways
-    // are excluded from this analysis entirely (see classify_corridor_privacy
-    // in pathing_pipeline.py), so they're simply not drawn in this view
-    // rather than shown with a misleading color.
-    if(mapMode === 'street_type' && (!cls || cls.type === 'excluded_private')) return;
-
-    let color, lowConfidence = false;
-    if(mapMode === 'street_type'){
-      color = STREET_TYPE_COLORS[cls.type] || STREET_TYPE_COLORS.unclassified;
-      lowConfidence = cls.type_confidence === 'low';
-    } else if(mapMode === 'residency'){
+    let color;
+    if(mapMode === 'residency'){
       const denom = cs.local + cs.visitor;
       const diff = denom ? (cs.local - cs.visitor) / denom : 0;
       color = residencyDiffColor(diff);
     } else {
       color = volumeColor(cs.total / maxTotal);
     }
-    let weight = Math.max(1.5, Math.min(8, 1.5 + 6 * (cs.total / maxTotal)));
+    let weight = scaledWeight(cs.total / maxTotal);
     const isTop20 = top20Highlight && top20Set.has(corridor);
     const dashClass = dir.to_count >= dir.from_count ? 'flow-to-stadium' : 'flow-from-stadium';
 
@@ -1032,20 +1191,13 @@ function renderStreetSegments(lots, residencyFilter){
       weight = Math.max(weight, 4);
     }
 
-    const streetTypeLine = (mapMode === 'street_type')
-      ? `<b style="color:${color}">${STREET_TYPE_LABELS[cls.type] || cls.type}</b>${lowConfidence ? ' <i>(low confidence — small sample or a tied vote)</i>' : ''}<br>`+
-        `Dominant mode: ${cls.dominant_mode || '–'} &nbsp;·&nbsp; Based on ${cls.n_votes} trip${cls.n_votes===1?'':'s'} that touched this street<br>`+
-        (cls.majority_highway ? `OSM road type: ${cls.majority_highway}<br>` : '')
-      : '';
-
     L.polyline(path, {
-      color, weight, opacity: lowConfidence ? .55 : .9, lineCap:'round',
-      className: dashClass, dashArray: lowConfidence ? '6,6' : null,
+      color, weight, opacity: .9, lineCap:'round',
+      className: dashClass,
     })
       .addTo(routeLayer)
       .bindTooltip(
         `<b>${corridor === key ? 'Unnamed Path' : corridor}</b>${isTop20 ? ' — Top 20 most-used street' : ''}<br>`+
-        streetTypeLine +
         `${fmtCount(cs.total, lastTotalLegs)} ${shareMode ? 'of all trips' : 'estimated people'} used this street<br>`+
         `Heading to stadium: ${fmtCount(cs.to_count, lastTotalToStadium)} &nbsp;·&nbsp; Heading from stadium: ${fmtCount(cs.from_count, lastTotalFromStadium)}<br>`+
         `Local: ${Math.round(100*cs.local/Math.max(cs.local+cs.visitor+cs.unknown,1))}% &nbsp;·&nbsp; Visitor: ${Math.round(100*cs.visitor/Math.max(cs.local+cs.visitor+cs.unknown,1))}%<br>`+
@@ -1057,6 +1209,86 @@ function renderStreetSegments(lots, residencyFilter){
   updateColorLegend(maxTotal);
 }
 
+// Street Type is its own exhibit pair, deliberately built from a different,
+// broader trip population than the Volume/Residency modes above (see the
+// STREET_TYPE_EDGE_* comment near the top of this file and
+// build_district_trajectory_legs in pathing_pipeline.py) -- so it does NOT
+// reuse computeSegmentAggregates()'s lot-trip corridorStats at all. Instead
+// it scales purely against STREET_CLASSIFICATION's own trip-vote counts,
+// and only within whichever of the two subtypes (vehicle or pedestrian) is
+// currently showing, so the much smaller pedestrian-corridor sample never
+// gets washed out by vehicle-street volumes or vice versa.
+const STREET_TYPE_SUBTYPES = {
+  // 'unclassified' corridors (touched by trips with no mode-classified
+  // leg) are shown in the vehicle exhibit by default -- a corridor with no
+  // mode data at all is far more often a quiet street a car drove past
+  // too briefly to resolve than a pedestrian-only path, and leaving it out
+  // of both exhibits would silently drop real streets from the map.
+  street_type_vehicle: ['gateway', 'local_street', 'unclassified', 'insufficient_data'],
+  street_type_pedestrian: ['pedestrian_corridor', 'event_pedestrian_corridor'],
+};
+
+function renderStreetTypeSegments(mode){
+  const includedTypes = new Set(STREET_TYPE_SUBTYPES[mode]);
+  const geometries = EFFECTIVE_STREET_TYPE_GEOMETRIES;
+  const corridors = STREET_TYPE_EDGE_CORRIDORS;
+
+  // First pass: find this subtype's own max vote count, so weight/color
+  // scale against "busiest corridor in THIS exhibit," not the other one.
+  const seenCorridors = new Set();
+  let maxVotes = 1;
+  const showsCorridor = (cls)=> cls && cls.type !== 'excluded_private' && (
+    includedTypes.has(cls.type) ||
+    (mode === 'street_type_pedestrian' && cls.event_pedestrian_flag));
+  Object.keys(geometries).forEach(key=>{
+    const corridor = corridors[key];
+    const cls = STREET_CLASSIFICATION[corridor];
+    if(!showsCorridor(cls)) return;
+    if(seenCorridors.has(corridor)) return;
+    seenCorridors.add(corridor);
+    maxVotes = Math.max(maxVotes, cls.n_votes || 0);
+  });
+
+  Object.keys(geometries).forEach(key=>{
+    const corridor = corridors[key];
+    const cls = STREET_CLASSIFICATION[corridor]; // {type, dominant_mode, mode_counts,
+                                                  // majority_highway, type_confidence, n_votes} or undefined
+    // Parking-lot aisles, driveways, and footways are excluded from street
+    // typing entirely (see classify_corridor_privacy in pathing_pipeline.py),
+    // so they're simply not drawn here rather than shown with a misleading color.
+    if(!showsCorridor(cls)) return;
+
+    const path = geometries[key];
+    const eventOverlay = mode === 'street_type_pedestrian' && cls.event_pedestrian_flag && cls.type === 'gateway';
+    const color = eventOverlay ? STREET_TYPE_COLORS.event_pedestrian_corridor
+                               : (STREET_TYPE_COLORS[cls.type] || STREET_TYPE_COLORS.unclassified);
+    const lowConfidence = cls.type_confidence === 'low' || cls.type === 'insufficient_data';
+    const pct = (v)=> (v === null || v === undefined) ? '–' : Math.round(v*100) + '%';
+    const eventLine = (cls.baseline_ped_share !== undefined)
+      ? `Pedestrian share — ordinary days: ${pct(cls.baseline_ped_share)} (${cls.baseline_votes||0} obs.) &nbsp;·&nbsp; event days: ${pct(cls.event_ped_share)} (${cls.event_votes||0} obs.)`+
+        (cls.event_shift !== null && cls.event_shift !== undefined
+          ? `<br>Event-day shift vs. same-month ordinary days: ${cls.event_shift>=0?'+':''}${(cls.event_shift*100).toFixed(1)} pts${cls.event_pedestrian_flag ? ' <b style="color:#ffb648">(event-day pedestrian surge)</b>' : ''}<br>` : '<br>')
+      : '';
+    const weight = scaledWeight((cls.n_votes || 0) / maxVotes, {min: 2.5, max: 8, floor: 2.5});
+
+    L.polyline(path, {
+      color, weight, opacity: lowConfidence ? .55 : .9, lineCap:'round',
+      dashArray: lowConfidence ? '6,6' : null,
+    })
+      .addTo(routeLayer)
+      .bindTooltip(
+        `<b>${corridor === key ? 'Unnamed Path' : corridor}</b><br>`+
+        `<b style="color:${color}">${STREET_TYPE_LABELS[cls.type] || cls.type}</b>${lowConfidence ? ' <i>(low confidence — small sample or a tied vote)</i>' : ''}<br>`+
+        eventLine +
+        `Based on ${cls.n_votes} classified observation${cls.n_votes===1?'':'s'} district-wide on this street<br>`+
+        (cls.majority_highway ? `OSM road type: ${cls.majority_highway}<br>` : '')
+      );
+  });
+
+  renderRankedPointsChart();
+  updateColorLegend(maxVotes, mode);
+}
+
 function renderStraightLineFallback(lots){
   // Used only when the export has no --street-match data. Draws the old
   // aggregated GPS-interpolated flow lines instead of real street segments.
@@ -1066,7 +1298,7 @@ function renderStraightLineFallback(lots){
       const key = lot + '||' + direction;
       (PRIMARY_DATA.flow_lines[key] || []).forEach(line=>{
         const color = direction === 'to_stadium' ? '#ffb648' : '#a6192e';
-        const weight = Math.max(1.5, Math.min(7, line.device_count/4));
+        const weight = scaledWeight(line.device_count / 24, {min: 2.5, max: 7, floor: 2.5});
         const dashClass = direction === 'to_stadium' ? 'flow-to-stadium' : 'flow-from-stadium';
         L.polyline(line.path, {color, weight, opacity:.78, lineCap:'round', className: dashClass})
           .addTo(routeLayer)
@@ -1076,7 +1308,7 @@ function renderStraightLineFallback(lots){
   });
 }
 
-function updateColorLegend(maxTotal){
+function updateColorLegend(maxTotal, streetTypeMode){
   const ramp = document.getElementById('legend-ramp');
   const label = document.getElementById('legend-label');
   const minEl = document.getElementById('legend-min');
@@ -1084,16 +1316,23 @@ function updateColorLegend(maxTotal){
   const minmaxRow = document.getElementById('legend-minmax-row');
   const categorical = document.getElementById('legend-categorical');
 
-  if(mapMode === 'street_type'){
+  if(streetTypeMode){
+    const types = STREET_TYPE_SUBTYPES[streetTypeMode];
+    const isVehicle = streetTypeMode === 'street_type_vehicle';
     ramp.style.display = 'none';
     minmaxRow.style.display = 'none';
-    label.textContent = 'Street type (by dominant travel mode)';
+    label.textContent = isVehicle
+      ? 'Vehicle streets (typed from ordinary days)'
+      : 'Pedestrian corridors (routine vs. event-day)';
     categorical.classList.add('visible');
-    categorical.innerHTML = ['gateway','pedestrian_corridor','local_street','unclassified'].map(t=>
+    categorical.innerHTML = types.map(t=>
       `<div class="row"><i class="sw" style="background:${STREET_TYPE_COLORS[t]}"></i>${STREET_TYPE_LABELS[t]}</div>`
     ).join('') +
     `<div class="row"><i class="sw dashed" style="color:${STREET_TYPE_COLORS.gateway}"></i>Low confidence (small sample / tie)</div>` +
-    `<div class="note">Parking-lot aisles, driveways, and footways are excluded — only real public streets are typed. Al Davis Way, for example, shows here; the pathways inside the lots don't.</div>`;
+    `<div class="note">${isVehicle
+      ? 'Vehicle streets: gateways (major roads) vs. local streets, typed from ordinary (non-event) days. Parking-lot aisles, driveways, and footways are excluded. Built from all devices near any district building, not just stadium trips — see "Method" below the map.'
+      : 'Pedestrian corridors on their own scale. Teal = pedestrian-heavy on ordinary days; amber = a clear jump toward walking on event days (also drawn over gateways that show it). Relative rankings from speed between pings, not counted pedestrians.'
+    }</div>`;
     return;
   }
   ramp.style.display = '';
@@ -1120,13 +1359,21 @@ function renderMap(lotsInput, residencyFilter){
   document.getElementById('legend-to-stadium').style.opacity = directionFilter === 'from_stadium' ? '.35' : '1';
   document.getElementById('legend-from-stadium').style.opacity = directionFilter === 'to_stadium' ? '.35' : '1';
 
+  const isStreetTypeMode = mapMode === 'street_type_vehicle' || mapMode === 'street_type_pedestrian';
+  updateModeExplainer();
   if(STREET_MATCH_AVAILABLE){
     document.getElementById('street-match-note').classList.remove('visible');
     document.getElementById('map-mode-toggle').style.display = 'flex';
-    document.getElementById('mode-filter-toggle').style.display = 'flex';
+    // The trip-mode filter, top-20 highlight, and share-of-trips toggle all
+    // operate on the lot-trip population/stats that Volume and Residency
+    // use -- they don't apply to the Street Type exhibits, which already
+    // split by mode internally and scale against their own vote counts
+    // rather than a shared trip total, so hide them rather than let them
+    // silently do nothing (or worse, look like they're filtering).
+    document.getElementById('mode-filter-toggle').style.display = isStreetTypeMode ? 'none' : 'flex';
+    document.getElementById('top20-toggle').style.display = isStreetTypeMode ? 'none' : 'block';
+    document.getElementById('share-mode-toggle').style.display = isStreetTypeMode ? 'none' : 'block';
     document.getElementById('color-legend').style.display = 'block';
-    document.getElementById('top20-toggle').style.display = 'block';
-    document.getElementById('share-mode-toggle').style.display = 'block';
     renderStreetSegments(lots, residencyFilter);
   } else {
     document.getElementById('street-match-note').classList.add('visible');

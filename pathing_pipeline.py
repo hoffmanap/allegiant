@@ -838,6 +838,235 @@ def filter_route_path_outliers(
     return kept_routes
 
 
+def build_district_trajectory_legs(pathing: pd.DataFrame, max_gap_minutes: float = 20.0) -> list[dict]:
+    """Build travel "legs" for street-TYPE classification specifically --
+    deliberately independent of lot/stadium qualification.
+
+    Every other analysis in this pipeline (lot_summary.json, residency,
+    extrapolation, the volume/residency map modes) is built from
+    find_qualifying_trips()'s output: a device must have pinged inside one
+    of the 21 mapped parking-lot polygons AND been confirmed at the
+    stadium within the post-window. That's the right population for "how
+    do people who parked in Lot X get to the stadium" -- but it's the
+    wrong population for "what kind of street is Russell Road": a trip
+    across Russell Road only shows up in routes.json if a device's WALK
+    from an already-parked car happened to clip that road's sidewalk --
+    the vehicle itself driving in on Russell Road, before ever reaching a
+    mapped lot, never appears there at all, because build_route_sequences
+    only windows pings between the lot-arrival ping and the stadium-
+    confirmation ping. A major vehicle gateway with zero pedestrian
+    sidewalk traffic would be invisible to that population by
+    construction, regardless of how much real car traffic it carries.
+
+    This function instead uses EVERY device remaining in `pathing` after
+    the pipeline's existing noise/staff/high-emittance filtering --
+    Azira's Pathing X report is itself anchored to confirmed stadium
+    visitors (that's what a "study location" pathing report is), so this
+    is still "people connected to a stadium visit," just without the
+    additional requirement that they specifically parked in a mapped lot.
+    That recovers the people who drove through on a gateway road without
+    ever pinging inside one of the 21 polygons: parked on-street, used a
+    lot not in parking_lots.geojson, were dropped off, etc.
+
+    A device's pings are ordered by real timestamp when available (see
+    normalize_timestamp -- this function assumes pathing["timestamp"] is
+    already populated where present), and split into separate "legs"
+    wherever two consecutive pings are more than max_gap_minutes apart --
+    without this, a single device's arrival trip, in-stadium dwell, and
+    departure trip would get chained into one nonsensical polyline
+    covering wildly different times of day. Without a real timestamp,
+    falls back to ordering by "time_before" (the signed clock relative to
+    that device's qualifying stadium visit) for that device's rows as a
+    single leg -- coarser, but still real elapsed time between consecutive
+    points, which is all classify_route_mode and street-matching need.
+
+    Returns a list of {"device_id", "path": [[lat,lon],...], "path_t":
+    [seconds,...]} -- the same shape classify_route_mode and
+    match_routes_to_street_segments already expect from routes.json's
+    route records, so both are reused as-is on this broader population.
+    """
+    legs = []
+    has_real_timestamp = "timestamp" in pathing.columns and pathing["timestamp"].notna().any()
+    gap_seconds = max_gap_minutes * 60
+
+    for device_id, dp in pathing.groupby("device_id"):
+        if has_real_timestamp and dp["timestamp"].notna().any():
+            dp = dp.dropna(subset=["timestamp"]).sort_values("timestamp")
+            # Per-element .timestamp() (matches build_route_sequences) rather
+            # than astype("int64"), whose result depends on the column's
+            # datetime64 unit (ns vs. us) and silently produces wrong,
+            # unit-off seconds on pandas versions that default to
+            # datetime64[us] -- which would make every gap look 1000x
+            # smaller than it really is and defeat leg-splitting entirely.
+            times = pd.Series([t.timestamp() for t in dp["timestamp"]], index=dp.index)
+        else:
+            dp = dp.sort_values("time_before", ascending=False)
+            times = -dp["time_before"].astype(float)  # monotonic increasing clock
+
+        times = times.to_numpy()
+        lats = dp["lat"].to_numpy()
+        lons = dp["lon"].to_numpy()
+        if len(times) < 2:
+            continue
+
+        gap_breaks = np.where(np.diff(times) > gap_seconds)[0] + 1
+        leg_bounds = np.split(np.arange(len(times)), gap_breaks)
+        for bound in leg_bounds:
+            if len(bound) < 2:
+                continue
+            legs.append({
+                "device_id": device_id,
+                "path": [[round(float(lats[i]), 6), round(float(lons[i]), 6)] for i in bound],
+                "path_t": [round(float(times[i]), 3) for i in bound],
+            })
+    return legs
+
+
+LOCAL_TZ = "America/Los_Angeles"
+TIME_OF_DAY_BUCKETS = [(0, 6, "overnight"), (6, 9, "am_peak"), (9, 15, "midday"),
+                       (15, 19, "pm_peak"), (19, 24, "evening")]
+
+
+def leg_slice_tags(start_epoch_seconds: float, event_dates: dict | None = None) -> list[str]:
+    """Time-slice tags for one leg, from its first ping's time (local Las Vegas
+    time): "event"/"non_event" (only when event_dates is given),
+    "weekday"/"weekend", a time-of-day bucket (overnight/am_peak/midday/
+    pm_peak/evening), and "date:YYYY-MM-DD"."""
+    ts = pd.Timestamp(start_epoch_seconds, unit="s", tz="UTC").tz_convert(LOCAL_TZ)
+    date_str = str(ts.date())
+    tags = ["weekend" if ts.dayofweek >= 5 else "weekday", f"date:{date_str}"]
+    for lo, hi, label in TIME_OF_DAY_BUCKETS:
+        if lo <= ts.hour < hi:
+            tags.append(label)
+            break
+    if event_dates is not None:
+        tags.append("event" if date_str in event_dates else "non_event")
+    return tags
+
+
+def summarize_slices(slice_counts: dict, corridor_info: dict, biking_as_wheeled: bool = False,
+                     min_votes_per_slice: int = 30, min_votes_for_dates: int = 300) -> dict:
+    """Turn per-corridor, per-tag mode tallies into a compact time-sliced report
+    for PUBLIC corridors: per slice, the wheeled/walking/stationary shares among
+    classified (non-unknown) votes, or "sparse" when a slice has fewer than
+    min_votes_per_slice votes. "wheeled" = car (+ biking if biking_as_wheeled).
+    Also event-vs-non-event and weekday-vs-weekend shifts in wheeled share, and
+    a per-date series for corridors with >= min_votes_for_dates votes."""
+    def shares(counter):
+        c = {m: n for m, n in counter.items() if m != "unknown"}
+        if biking_as_wheeled and "biking" in c:
+            c["car"] = c.get("car", 0) + c.pop("biking")
+        n = sum(c.values())
+        if n < min_votes_per_slice:
+            return {"n": n, "status": "sparse"}
+        return {"n": n, "status": "ok",
+                "wheeled": round(c.get("car", 0) / n, 3),
+                "walking": round(c.get("walking", 0) / n, 3),
+                "stationary": round(c.get("stationary", 0) / n, 3),
+                "biking": round(c.get("biking", 0) / n, 3)}
+    out = {}
+    for corridor, tags in slice_counts.items():
+        info = corridor_info.get(corridor)
+        if not info or not info.get("is_public"):
+            continue
+        overall = sum(sum(c for m, c in tags.get(t, {}).items() if m != "unknown")
+                      for t in ("weekday", "weekend"))
+        if overall < min_votes_per_slice:
+            continue
+        slices = {t: shares(c) for t, c in tags.items() if not t.startswith("date:")}
+        entry = {"overall_type": info["type"], "n_classified_votes": overall, "slices": slices}
+        for a, b, key in (("event", "non_event", "event_minus_non_event_wheeled"),
+                          ("weekend", "weekday", "weekend_minus_weekday_wheeled")):
+            sa, sb = slices.get(a, {}), slices.get(b, {})
+            if sa.get("status") == "ok" and sb.get("status") == "ok":
+                entry[key] = round(sa["wheeled"] - sb["wheeled"], 3)
+        if overall >= min_votes_for_dates:
+            entry["per_date"] = {t[5:]: shares(c) for t, c in sorted(tags.items())
+                                 if t.startswith("date:") and shares(c)["status"] == "ok"}
+        out[corridor] = entry
+    return out
+
+
+def refine_street_types(street_classification: dict, slice_counts: dict,
+                        ped_share_threshold: float = 0.50, min_baseline_votes: int = 200,
+                        event_shift_threshold: float = 0.10, min_event_share: float = 0.50,
+                        min_event_votes: int = 100) -> dict:
+    """Second-stage street typing for the district-wide run.
+
+    Gateways (from classify_street_types) are kept as-is. Every OTHER public
+    corridor is typed from its ROUTINE baseline, so event days cannot skew the
+    label, and event days are reported separately as a flag:
+
+      pedestrian_corridor        -- baseline pedestrian share >= ped_share_threshold
+      event_pedestrian_corridor  -- baseline below that, but event-day pedestrian
+                                    share >= min_event_share AND >= baseline +
+                                    event_shift_threshold (needs >= min_event_votes)
+      local_street               -- everything else
+      insufficient_data          -- fewer than min_baseline_votes baseline votes
+
+    "Pedestrian share" = (walking + stationary) / all classified (non-"unknown")
+    votes. Baseline = the "non_event" tally if event tags exist, else "all".
+    Because speed from sparse pings only weakly separates modes, treat these as
+    RELATIVE rankings, not measured pedestrian volumes.
+    Returns {corridor: {refined_type, baseline_ped_share, baseline_votes,
+    event_ped_share, event_votes, event_shift, base_type}} (public corridors only).
+    """
+    def share(counter):
+        c = {m: n for m, n in (counter or {}).items() if m != "unknown"}
+        n = sum(c.values())
+        return (None if n == 0 else (c.get("walking", 0) + c.get("stationary", 0)) / n), n
+
+    out = {}
+    for corridor, info in street_classification.items():
+        if not info.get("is_public"):
+            continue
+        tags = slice_counts.get(corridor, {})
+        base_counter = tags.get("non_event", tags.get("all"))
+        b_share, b_n = share(base_counter)
+        e_share, e_n = share(tags.get("event"))
+        # Event days fall mostly in the NFL/NCAA season, and GPS cadence (and so
+        # apparent mode mix) varies a lot by month. So compare event days against
+        # non-event days from the SAME months: re-weight the non-event share by the
+        # event votes' month mix. Falls back to the plain baseline if month tags are absent.
+        matched_share = None
+        ev_m = {k.split("|", 1)[1]: v for k, v in tags.items() if k.startswith("event|")}
+        ne_m = {k.split("|", 1)[1]: v for k, v in tags.items() if k.startswith("non_event|")}
+        if ev_m and ne_m:
+            num = den = 0.0
+            for m, ev_c in ev_m.items():
+                w = sum(n for k, n in ev_c.items() if k != "unknown")
+                s_m, n_m = share(ne_m.get(m))
+                if w and s_m is not None and n_m >= 20:
+                    num += w * s_m
+                    den += w
+            if den:
+                matched_share = num / den
+        ref_share = matched_share if matched_share is not None else b_share
+        shift = round(e_share - ref_share, 3) if (e_share is not None and ref_share is not None and e_n >= min_event_votes) else None
+        base_type = info["type"]
+        if base_type == "gateway":
+            refined = "gateway"
+        elif base_type == "unclassified":
+            refined = "unclassified"
+        elif b_share is None or b_n < min_baseline_votes:
+            refined = "insufficient_data"
+        elif b_share >= ped_share_threshold:
+            refined = "pedestrian_corridor"
+        elif (shift is not None and e_share >= min_event_share and shift >= event_shift_threshold):
+            refined = "event_pedestrian_corridor"
+        else:
+            refined = "local_street"
+        out[corridor] = {
+            "refined_type": refined, "base_type": base_type,
+            "baseline_ped_share": None if b_share is None else round(b_share, 3), "baseline_votes": b_n,
+            "event_ped_share": None if e_share is None else round(e_share, 3), "event_votes": e_n,
+            "month_matched_baseline_ped_share": None if matched_share is None else round(matched_share, 3),
+            "event_shift": shift,
+            "event_pedestrian_flag": bool(shift is not None and e_share >= min_event_share and shift >= event_shift_threshold),
+        }
+    return out
+
+
 def build_route_sequences(
     pathing: pd.DataFrame,
     qualifying_trips: pd.DataFrame,
@@ -1026,6 +1255,108 @@ def classify_route_mode(route: dict) -> dict:
         "n_segments_total": n_total,
         "mode_confidence": "ok" if len(speeds) >= MODE_MIN_SEGMENTS_FOR_CONFIDENCE else "low",
     }
+
+
+MODE_LOCAL_WINDOW_SEGMENTS = 5  # how many neighboring ping-to-ping segments to pool for a
+# "local" mode estimate in classify_route_local_modes -- large enough to smooth the same GPS
+# jitter classify_route_mode's whole-trip median was built to resist, small enough that the
+# label still changes where the device's real behavior changes within one leg.
+
+
+MODE_LOCAL_MAX_SEGMENT_SECONDS = 60.0  # see classify_route_local_modes: a segment spanning a
+# longer ping gap is a travel+dwell mixture, not a travel speed, and is ignored for local modes.
+
+
+def classify_route_local_modes(
+    route: dict, window: int = MODE_LOCAL_WINDOW_SEGMENTS,
+    max_segment_seconds: float | None = MODE_LOCAL_MAX_SEGMENT_SECONDS,
+) -> list:
+    """Like classify_route_mode, but returns one mode label PER PING instead
+    of a single label for the whole trip.
+
+    This exists for the district-wide street-TYPE population only (see
+    build_district_trajectory_legs / README §8c) -- a district-wide leg's
+    boundary is only a 20-minute ping gap, which can span multiple real
+    activities on one device: e.g. drive in on a gateway road, park, then
+    walk around tailgating for 15 minutes, all without ever crossing that
+    gap. classify_route_mode's single trip-WIDE median would let the far
+    more numerous slow walking-paced segments later in the leg drag the
+    WHOLE leg's label to "walking" -- including the genuinely fast driving
+    that happened earlier, on a completely different street, and that
+    mislabeled "walking" vote then gets cast for every corridor the leg
+    touched, gateway roads included. This was confirmed on real data: Al
+    Davis Way, Russell Road, and Hacienda Avenue -- all real vehicle
+    gateways -- showed walking-to-car vote ratios between 11:1 and 24:1
+    under the whole-leg approach, which isn't plausible even accounting
+    for pedestrian crowds.
+
+    Instead, each ping gets a LOCAL mode from a small centered rolling
+    median (default window=5 segments) of nearby segment speeds -- enough
+    to smooth the same GPS jitter classify_route_mode resists, small
+    enough that the label actually tracks where the device's real behavior
+    changes, rather than being fixed for the whole leg. match_routes_to_
+    street_segments then casts each corridor's vote from the LOCAL modes
+    of only the pings that actually snapped to that corridor, instead of
+    the single whole-leg mode -- so a leg that drove in on a gateway and
+    then walked elsewhere correctly casts a "car" vote on the gateway and
+    "walking" votes on wherever it later walked, rather than one label for
+    both.
+
+    Returns a list the same length as route["path"]; entry i is the local
+    mode ("walking"/"biking"/"car"/"stationary", or None where there isn't
+    enough nearby speed data) "covering" ping i.
+    """
+    path = route.get("path") or []
+    times = route.get("path_t") or []
+    n = len(path)
+    if n < 2 or len(times) != n:
+        return [None] * n
+
+    lats = np.array([p[0] for p in path])
+    lons = np.array([p[1] for p in path])
+    t = np.array(times, dtype=float)
+    dt = np.diff(t)
+    dist_m = haversine_miles(lats[:-1], lons[:-1], lats[1:], lons[1:]) * 1609.344
+
+    n_seg = n - 1
+    seg_speed = np.full(n_seg, np.nan)
+    valid = dt >= MODE_MIN_SEGMENT_SECONDS
+    if max_segment_seconds is not None:
+        # Sparse-ping correction. Real device data: median ping gap ~41s, 19% of gaps >5 min,
+        # and apparent speed collapses as the gap grows (segments >7 m/s: 27% at 2-15s gaps,
+        # 2% at 60-180s, 0% beyond 3 min) because a long gap mixes driving with sitting
+        # parked. distance/elapsed over such a gap reads as 'walking' or 'biking' even for a
+        # car, which is what kept Russell Rd / Hacienda Ave / Dean Martin Dr labeled
+        # pedestrian. Only short-gap segments carry a trustworthy travel speed.
+        valid &= dt <= max_segment_seconds
+    seg_speed[valid] = dist_m[valid] / dt[valid]
+    seg_speed[seg_speed > MODE_IMPLAUSIBLE_MPS] = np.nan  # drop noise/spoofed-fix spikes
+
+    half = window // 2
+    seg_mode = [None] * n_seg
+    for i in range(n_seg):
+        lo = max(0, i - half)
+        hi = min(n_seg, i + half + 1)
+        window_speeds = seg_speed[lo:hi]
+        window_speeds = window_speeds[~np.isnan(window_speeds)]
+        if len(window_speeds) == 0:
+            continue
+        med = float(np.median(window_speeds))
+        if med <= MODE_STATIONARY_MAX_MPS:
+            seg_mode[i] = "stationary"
+        elif med <= MODE_WALK_MAX_MPS:
+            seg_mode[i] = "walking"
+        elif med <= MODE_BIKE_MAX_MPS:
+            seg_mode[i] = "biking"
+        else:
+            seg_mode[i] = "car"
+
+    if not seg_mode:
+        return [None] * n
+    # Map segment-level modes (len n-1) to per-PING modes (len n): ping i
+    # "belongs to" the segment starting at it, except the final ping, which
+    # reuses the previous segment's mode (there's no segment starting there).
+    return seg_mode + [seg_mode[-1]]
 
 
 # --------------------------------------------------------------------------- #
@@ -1411,6 +1742,29 @@ def parse_args(argv=None) -> argparse.Namespace:
                          "that restriction and keep every component, e.g. if you've confirmed the "
                          "small components are real isolated pedestrian areas rather than an "
                          "export artifact.")
+    p.add_argument("--street-type-max-gap-minutes", type=float, default=20.0,
+                    help="For street-TYPE classification only (gateway/pedestrian corridor/local "
+                         "street -- see build_district_trajectory_legs): a device's pings are split "
+                         "into separate travel 'legs' wherever two consecutive pings are more than "
+                         "this many minutes apart, so an arrival trip, in-stadium dwell, and "
+                         "departure trip don't get chained into one nonsensical polyline. "
+                         "Default: 20 minutes.")
+    p.add_argument("--biking-as-wheeled", action="store_true",
+                    help="For street-type classification: pool 'biking' votes with 'car' votes. "
+                         "Near dense traffic, slow or sparsely-pinged cars fall in the 2.2-7 m/s "
+                         "biking speed band, so 'biking' on arterials is mostly low-speed vehicle "
+                         "traffic. Assumption; default off. Raw mode_counts are still reported.")
+    p.add_argument("--street-type-use-lot-trips-only", action="store_true",
+                    help="Compute street-type classification from the same lot-and-stadium-"
+                         "qualified trips used for routes.json/the dashboard's Volume and "
+                         "Residency map modes, instead of the broader district-wide population "
+                         "(every device connected to a stadium visit, not just ones confirmed "
+                         "parking in a mapped lot). This is the OLD behavior -- it systematically "
+                         "under-counts vehicle traffic on gateway roads, because a car trip only "
+                         "shows up in the lot-qualified population if the walk FROM the parked "
+                         "car happens to clip that road's sidewalk, never the drive itself. Use "
+                         "this only if the district-wide pass is too slow for your machine/network "
+                         "and you need a faster (if less accurate for gateways) fallback.")
     return p.parse_args(argv)
 
 
@@ -1604,6 +1958,29 @@ def bridge_route_gaps(
     }
     new_per_route_edges = []
 
+    # Performance: a gap used to cost up to four UNBOUNDED Dijkstra searches
+    # plus a path search over the whole graph, checked against the distance
+    # cap only afterward -- fine for a few thousand lot-qualified trips, but
+    # a district-wide run (hundreds of thousands of legs hopping across the
+    # district) ran for 5+ hours on 150k legs. Instead: one Dijkstra per
+    # SOURCE NODE, stopped at max_bridge_meters, cached for the whole call.
+    # The graph is small (thousands of nodes), so after a few thousand cheap
+    # capped searches every gap is a dictionary lookup. Results are the same
+    # as before: a path is bridged iff its true shortest length is
+    # <= max_bridge_meters, choosing the shortest of the four endpoint pairs.
+    node_component = {}
+    for comp_id, comp_nodes in enumerate(nx.connected_components(G_undirected)):
+        for n in comp_nodes:
+            node_component[n] = comp_id
+    reach_cache: dict = {}
+
+    def reachable_within_cap(src):
+        hit = reach_cache.get(src)
+        if hit is None:
+            hit = nx.single_source_dijkstra(G_undirected, src, cutoff=max_bridge_meters, weight="length")
+            reach_cache[src] = hit  # (dists: {node: length}, paths: {node: [nodes]})
+        return hit
+
     for edge_seq in per_route_edges:
         if len(edge_seq) < 2:
             new_per_route_edges.append(edge_seq)
@@ -1618,26 +1995,29 @@ def bridge_route_gaps(
 
             stats["gaps_found"] += 1
             best_path, best_length = None, None
+            any_same_component = False
             for a in (lo1, hi1):
+                dists, paths = reachable_within_cap(a)
                 for b in (lo2, hi2):
-                    try:
-                        length = nx.shortest_path_length(G_undirected, a, b, weight="length")
-                    except (nx.NetworkXNoPath, nx.NodeNotFound):
-                        continue
+                    if node_component.get(a) == node_component.get(b):
+                        any_same_component = True
+                    length = dists.get(b)
+                    if length is None:
+                        continue  # no path at all, or one longer than max_bridge_meters
                     if best_length is None or length < best_length:
-                        best_length, best_path = length, nx.shortest_path(G_undirected, a, b, weight="length")
+                        best_length, best_path = length, paths[b]
 
-            if best_path is not None and best_length <= max_bridge_meters:
+            if best_path is not None:
                 for j in range(len(best_path) - 1):
                     new_seq.append(canonical_key_from_uv(best_path[j], best_path[j + 1]))
                 stats["bridge_edges_added"] += len(best_path) - 1
                 stats["gaps_bridged"] += 1
             else:
                 stats["gaps_left_open"] += 1
-                if best_path is None:
-                    stats["gaps_left_open_no_path"] += 1
-                else:
+                if any_same_component:
                     stats["gaps_left_open_too_far"] += 1
+                else:
+                    stats["gaps_left_open_no_path"] += 1
 
             new_seq.append(edge_seq[i])
         new_per_route_edges.append(new_seq)
@@ -1648,6 +2028,9 @@ def bridge_route_gaps(
 def match_routes_to_street_segments(
     routes: list[dict], G, max_snap_distance_m: float = 60.0, max_bridge_meters: float = 400.0,
     lot_centroids: dict | None = None, route_modes: list[str | None] | None = None,
+    route_local_modes: list[list] | None = None,
+    route_slice_tags: list[list[str]] | None = None,
+    corridor_slice_counts_out: dict | None = None,
 ) -> tuple[list[list], dict, dict, dict, dict, dict, dict]:
     """Snap every route's ping sequence onto the nearest real street edges in
     G. Returns (per_route_edge_lists, edge_geometries, edge_corridors, stats)
@@ -1694,17 +2077,33 @@ def match_routes_to_street_segments(
     are also returned (keyed by canonical edge key) so a caller can apply
     street-type classification (classify_corridor_types) without having
     to re-derive OSM tag data that was already pulled here.
+
+    route_local_modes, if given (one list of per-PING modes per route, from
+    classify_route_local_modes -- same shape as each route's "path"), takes
+    PRIORITY over route_modes for corridor_mode_counts: instead of casting
+    one whole-trip-mode vote for every corridor a route touched, each
+    corridor's vote is the majority LOCAL mode among only the pings that
+    actually snapped onto that corridor's edges. This matters for any
+    route whose single ping-gap-bounded "trip" can span more than one real
+    activity (see build_district_trajectory_legs) -- a whole-trip mode
+    would incorrectly apply a later walking phase's label to an earlier
+    driving phase's street, and vice versa. A corridor reached only via a
+    bridged gap (bridge_route_gaps fills in a street-network path between
+    two observed points with no ping of its own there) has no local-mode
+    evidence and falls back to "unknown" rather than guessing.
     """
     import numpy as _np
     import osmnx as ox
     import pyproj
 
-    flat_lat, flat_lon, owner = [], [], []
+    flat_lat, flat_lon, owner, flat_local_mode = [], [], [], []
     for i, r in enumerate(routes):
-        for lat, lon in r["path"]:
+        local_modes_i = (route_local_modes[i] if route_local_modes is not None and i < len(route_local_modes) else None)
+        for j, (lat, lon) in enumerate(r["path"]):
             flat_lat.append(lat)
             flat_lon.append(lon)
             owner.append(i)
+            flat_local_mode.append(local_modes_i[j] if local_modes_i is not None and j < len(local_modes_i) else None)
 
     if not flat_lat:
         return (
@@ -1720,7 +2119,11 @@ def match_routes_to_street_segments(
     transformer = pyproj.Transformer.from_crs("EPSG:4326", G_proj.graph["crs"], always_xy=True)
     proj_x, proj_y = transformer.transform(_np.array(flat_lon), _np.array(flat_lat))
 
+    import time as _time
+    _t0 = _time.time()
+    log.info("Finding nearest street edge for %d pings...", len(flat_lat))
     raw_edges, dists = ox.distance.nearest_edges(G_proj, X=proj_x, Y=proj_y, return_dist=True)
+    log.info("Nearest-edge lookup done in %.0fs.", _time.time() - _t0)
     matched_mask = dists <= max_snap_distance_m
     n_matched = int(matched_mask.sum())
     n_unmatched = len(matched_mask) - n_matched
@@ -1731,9 +2134,17 @@ def match_routes_to_street_segments(
         return f"{lo}_{hi}_{k}"
 
     per_route_raw = [[] for _ in routes]
-    for owner_idx, edge, is_matched in zip(owner, raw_edges, matched_mask):
+    # For each route, every edge key it touched -> the LOCAL modes of just the
+    # pings that snapped to that specific edge (only populated when
+    # route_local_modes was given). Used below to cast per-corridor votes
+    # from local, not whole-trip, mode evidence.
+    per_route_edge_local_modes: list[dict] = [{} for _ in routes]
+    for owner_idx, edge, is_matched, local_mode in zip(owner, raw_edges, matched_mask, flat_local_mode):
         if is_matched:
-            per_route_raw[owner_idx].append(canonical_key(edge))
+            key = canonical_key(edge)
+            per_route_raw[owner_idx].append(key)
+            if route_local_modes is not None:
+                per_route_edge_local_modes[owner_idx].setdefault(key, []).append(local_mode)
         # unmatched pings contribute nothing -- the route just has a gap
         # here rather than a fabricated edge
 
@@ -1745,7 +2156,10 @@ def match_routes_to_street_segments(
                 deduped.append(e)
         per_route_edges.append(deduped)
 
+    _t0 = _time.time()
+    log.info("Bridging route gaps across %d route(s)...", len(per_route_edges))
     per_route_edges, bridge_stats = bridge_route_gaps(per_route_edges, G, max_bridge_meters=max_bridge_meters)
+    log.info("Gap bridging done in %.0fs.", _time.time() - _t0)
     if bridge_stats["gaps_found"]:
         log.info(
             "Route-gap bridging: %d gaps found (device pinged in a lot, then again near the "
@@ -1793,7 +2207,40 @@ def match_routes_to_street_segments(
     edge_corridors = build_edge_corridors(edge_names, edge_nodes, edge_tags, edge_geometries, lot_centroids)
 
     corridor_mode_counts: dict[str, Counter] = {}
-    if route_modes is not None:
+    # Optional time-sliced tallies: if route_slice_tags[i] is a list of tags
+    # (e.g. ["event", "weekday", "am_peak", "date:2025-05-04"]) for route i,
+    # each corridor vote is ALSO added under every one of those tags, into
+    # corridor_slice_counts_out[corridor][tag][mode]. Totals are unchanged.
+    slice_out = corridor_slice_counts_out if (route_slice_tags is not None and corridor_slice_counts_out is not None) else None
+    if route_local_modes is not None:
+        # Local-mode path (see the docstring above): vote per (route, corridor)
+        # using the majority LOCAL mode among only the pings that actually
+        # snapped to THAT corridor's edges, not one label for the whole route.
+        for i, edge_seq in enumerate(per_route_edges):
+            local_by_edge = per_route_edge_local_modes[i]
+            corridor_to_edges: dict[str, list[str]] = {}
+            for e in edge_seq:
+                c = edge_corridors.get(e, e)
+                corridor_to_edges.setdefault(c, []).append(e)
+            for c, edges_here in corridor_to_edges.items():
+                pooled = []
+                for e in edges_here:
+                    pooled.extend(m for m in local_by_edge.get(e, []) if m is not None)
+                if pooled:
+                    mode_key = Counter(pooled).most_common(1)[0][0]
+                else:
+                    # Only reached via a bridged gap, or every local-mode
+                    # estimate near it was None (too little nearby speed
+                    # data) -- no real evidence either way, so this stays
+                    # "unknown" rather than borrowing a label from
+                    # somewhere else on the route.
+                    mode_key = "unknown"
+                corridor_mode_counts.setdefault(c, Counter())[mode_key] += 1
+                if slice_out is not None and i < len(route_slice_tags):
+                    by_tag = slice_out.setdefault(c, {})
+                    for tag in route_slice_tags[i]:
+                        by_tag.setdefault(tag, Counter())[mode_key] += 1
+    elif route_modes is not None:
         for i, edge_seq in enumerate(per_route_edges):
             mode = route_modes[i] if i < len(route_modes) else None
             mode_key = mode or "unknown"
@@ -2093,6 +2540,7 @@ STREET_TYPE_MIN_VOTES_FOR_CONFIDENCE = 5
 def classify_street_types(
     edge_corridors: dict, edge_names: dict, edge_tags: dict, edge_geometries: dict,
     corridor_mode_counts: dict, lot_polygons: dict | None = None,
+    biking_as_wheeled: bool = False,
 ) -> dict:
     """Assign each real public street corridor one of three types, based on
     the single most common mode (from classify_route_mode, tallied per
@@ -2117,6 +2565,13 @@ def classify_street_types(
     corridor that was never actually touched by any mode-classified trip
     (corridor_mode_counts has no entry, or every trip touching it had
     mode=None) gets type "unclassified" rather than a guess.
+
+    biking_as_wheeled: when True, "biking" votes are pooled with "car" votes
+    when picking the dominant mode (the reported "mode_counts" stays raw).
+    Rationale: around dense traffic (e.g. the Las Vegas Strip) slow-moving or
+    sparsely-pinged cars land in the 2.2-7 m/s "biking" speed band, so on
+    arterials "biking" is mostly congested/low-speed vehicle traffic, not
+    cyclists. This is an ASSUMPTION; default False keeps the speed-only labels.
 
     Returns {corridor_key: {"type", "is_public", "dominant_mode",
     "mode_counts", "majority_highway", "reason", "type_confidence",
@@ -2154,6 +2609,8 @@ def classify_street_types(
             continue
 
         mode_counts = {m: n for m, n in corridor_mode_counts.get(corridor_key, {}).items() if m != "unknown"}
+        if biking_as_wheeled and "biking" in mode_counts:
+            mode_counts["car"] = mode_counts.get("car", 0) + mode_counts.pop("biking")
         n_votes = sum(mode_counts.values())
         if not mode_counts:
             dominant_mode, street_type, type_confidence = None, "unclassified", None
@@ -2512,9 +2969,89 @@ def main(argv=None):
             )
             (out_dir / "street_match_stats.json").write_text(json.dumps(match_stats, indent=2))
 
+            # --- Street-TYPE classification: a DELIBERATELY SEPARATE, broader
+            # population from the lot-and-stadium-qualified `routes` above. See
+            # build_district_trajectory_legs's docstring for why: a vehicle
+            # gateway with real car traffic but no pedestrian sidewalk crossing
+            # would be invisible to the lot-qualified population, because that
+            # population only ever captures the WALK from an already-parked
+            # car, never the drive in. Everything else in this file (routes.json,
+            # lot_summary.json, residency, extrapolation, matched_edges on
+            # routes themselves) is untouched and still comes from the
+            # lot-qualified `routes` -- only street_classification.json's
+            # source population changes here.
+            if args.street_type_use_lot_trips_only:
+                log.info("--street-type-use-lot-trips-only set: classifying street types from "
+                         "the same lot-qualified trips as everything else (legacy behavior).")
+                type_edge_corridors, type_edge_names = edge_corridors, edge_names
+                type_edge_tags, type_edge_geometries = edge_tags, edge_geometries
+                type_corridor_mode_counts = corridor_mode_counts
+            else:
+                district_legs = build_district_trajectory_legs(
+                    pathing, max_gap_minutes=args.street_type_max_gap_minutes
+                )
+                n_leg_devices = len({l["device_id"] for l in district_legs})
+                log.info(
+                    "Street-type classification uses a SEPARATE, broader population: %d travel "
+                    "leg(s) from %d device(s) district-wide -- not required to have pinged inside "
+                    "a mapped lot or confirmed a stadium arrival within --max-post-minutes, only "
+                    "to be part of Azira's own Pathing X visit-anchored export (versus %d devices "
+                    "in the %d lot-qualified trips everything else in this run uses). This is what "
+                    "lets a real vehicle gateway with little or no pedestrian sidewalk traffic "
+                    "still get classified correctly.",
+                    len(district_legs), n_leg_devices, stats.devices_confirmed_stadium, len(routes),
+                )
+                # Whole-leg mode (district_leg_modes) is kept only for logging/diagnostics
+                # below -- the actual corridor votes use PER-PING local modes instead (see
+                # classify_route_local_modes), because a district-wide leg's only boundary
+                # is a 20-minute ping gap, which can span more than one real activity (e.g.
+                # drive in on a gateway, park, then walk around tailgating). A whole-leg
+                # median would let the later walking phase's far more numerous slow
+                # segments drag the ENTIRE leg's label to "walking" -- including the
+                # genuinely fast driving that happened earlier, on a different street. This
+                # was confirmed on real data before this fix: Al Davis Way, Russell Road,
+                # and Hacienda Avenue -- all real vehicle gateways -- showed 11:1 to 24:1
+                # walking-to-car vote ratios under the whole-leg approach.
+                district_leg_modes = []
+                district_leg_local_modes = []
+                for leg in district_legs:
+                    mr = classify_route_mode(leg)
+                    leg["mode"] = mr["mode"]
+                    leg["mode_confidence"] = mr["mode_confidence"]
+                    district_leg_modes.append(mr["mode"] if mr["mode_confidence"] == "ok" else None)
+                    district_leg_local_modes.append(classify_route_local_modes(leg))
+
+                log.info("Snapping %d district-wide travel legs onto the street network "
+                          "(this pass is independent of the lot-trip snapping above and can "
+                          "take noticeably longer, since it isn't limited to lot-confirmed "
+                          "devices -- use --street-type-use-lot-trips-only for a faster, less "
+                          "accurate-for-gateways fallback if needed)...", len(district_legs))
+                (
+                    _district_per_leg_edges, type_edge_geometries, type_edge_corridors, district_match_stats,
+                    type_corridor_mode_counts, type_edge_tags, type_edge_names,
+                ) = match_routes_to_street_segments(
+                    district_legs, G, max_snap_distance_m=args.street_max_snap_distance_m,
+                    max_bridge_meters=args.street_max_bridge_distance_m,
+                    lot_centroids=centroids, route_modes=district_leg_modes,
+                    route_local_modes=district_leg_local_modes,
+                )
+                (out_dir / "street_classification_edge_geometries.json").write_text(
+                    json.dumps(type_edge_geometries)
+                )
+                (out_dir / "street_classification_edge_corridors.json").write_text(
+                    json.dumps(type_edge_corridors)
+                )
+                log.info(
+                    "District-wide street matching: %.1f%% of pings matched within %.0fm "
+                    "(%d distinct segments touched, %d corridors after merging).",
+                    district_match_stats["pct_matched"], args.street_max_snap_distance_m,
+                    len(type_edge_geometries), len(set(type_edge_corridors.values())),
+                )
+
             street_classification = classify_street_types(
-                edge_corridors, edge_names, edge_tags, edge_geometries,
-                corridor_mode_counts, lot_polygons=lot_polygons,
+                type_edge_corridors, type_edge_names, type_edge_tags, type_edge_geometries,
+                type_corridor_mode_counts, lot_polygons=lot_polygons,
+                biking_as_wheeled=args.biking_as_wheeled,
             )
             (out_dir / "street_classification.json").write_text(json.dumps(street_classification, indent=2))
             type_counts = Counter(v["type"] for v in street_classification.values())

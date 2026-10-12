@@ -6,9 +6,12 @@ a local-vs-visitor split and a lot-by-lot / aggregated picker.
 
 ```
 stadium-pathing/
-├── pathing_pipeline.py     # cleans + aggregates raw Azira exports
+├── pathing_pipeline.py     # cleans + aggregates raw Azira exports (stadium-anchored pathing)
+├── district_wide_street_analysis.py  # standalone street-type analysis (district-wide extract)
+├── build_dashboard.py      # builds index.html from index_template.html + output folders
 ├── make_sample_data.py     # generates synthetic test data for a dry run
-├── index.html              # the scrollytelling dashboard
+├── index_template.html     # dashboard source
+├── index.html              # the scrollytelling dashboard (generated)
 ├── parking_lots.geojson    # real parking-lot boundary polygons
 ├── data/                   # Azira exports live here
 │   ├── pathing.tsv.gz
@@ -16,6 +19,111 @@ stadium-pathing/
 │   └── visitor_home.tsv.gz
 └── output/                 # pipeline writes JSON here; index.html reads it
 ```
+
+## 0. Overview: two analyses, one project
+
+This project answers **two different questions with two different sets of
+devices**. Keeping them separate is the most important thing to understand
+when explaining the work.
+
+| | **A. Pathing exercise** | **B. Street classification** |
+|---|---|---|
+| Question | Which streets do people use to walk from a parking lot to the stadium, and how long does it take? | Which streets are vehicle gateways, which are pedestrian corridors, which are local access streets? |
+| Population | Devices seen in a mapped parking lot *and* then at the stadium | Every device seen within 30 minutes before/after visiting *any* district building (merged polygon) |
+| Data | Pathing X export anchored to the stadium, plus Pin and Visitors Home reports | Pathing X export `10178831_Clark_pathing_x_report.tsv.gz` (640 dates, 902,880 device-days) |
+| Time bias | Mostly **event days** (event dates were 42.4% of device-days, about 5x the activity of other days) | Event dates are about 10.5% of device-days; includes ordinary days |
+| Code | `pathing_pipeline.py` | `district_wide_street_analysis.py` |
+| Dashboard maps | Volume; Local vs. Visitor | Street Type: Vehicle; Street Type: Pedestrian |
+| Good for | Event-day walk-in routes, lot attribution, attendance estimates, local vs. visitor | Day-to-day street roles; event-day change in pedestrian use |
+| Not good for | Judging how streets are used on ordinary days (it over-represents pedestrians) | Counting people or lot-level questions |
+
+### How the thinking evolved (and why the design is what it is)
+
+1. **First pass: type streets from the pathing trips.** Street type was
+   computed from the same lot-to-stadium trips. Result: nearly every street,
+   including major arterials, came out as a pedestrian corridor.
+2. **Fix one: mode was applied per trip, not per street.** One median speed
+   labeled a whole drive-park-walk trip "walking", and that label was applied
+   to every street on it. Mode is now classified per ping (rolling median of
+   segment speeds), and a street's vote comes from only the pings that
+   snapped to it. Gateways went from 1 to 7.
+3. **Hypothesis: the trip population is event-skewed.** Because the pathing
+   extract is anchored to stadium visits, it is dominated by event days and
+   pedestrians. We tested it rather than assuming it: event dates were 42.4%
+   of device-days (35.9 vs. 7.2 trips/day) in that data. Hypothesis confirmed.
+4. **Broader extract.** A new extract (30 minutes before/after trips to any
+   building in the district) was requested and analyzed with its own script,
+   so street typing no longer depends on the lot-qualified trips. Event dates
+   fell to 10.5% of device-days.
+5. **Scale and sparse pings.** The first full run (1.06M legs) never finished
+   (an uncached shortest-path search in gap bridging); fixed with caching and a
+   seeded 150k-300k leg sample. Results were stable across seeds 0 and 2.
+   Pings can be seconds or many minutes apart, so speeds over gaps longer
+   than 60 s are ignored.
+6. **Slow cars look like bikes.** Around the Strip, congested or sparsely-pinged
+   cars fall in the 2.2-7 m/s "biking" band, and arterials still lost to
+   walking by a few points. For street typing, "biking" is counted as vehicle
+   traffic (`--biking-as-wheeled`, an assumption). Sanity check: ACS B08301 for
+   the district's block group (BG 1, Tract 29.62: 623 workers) showed 88% of
+   commuters driving, 6% bus, 3% walking, 0 biking. It describes residents,
+   not people who work in the district, so it supports the assumption but is
+   not proof. With it, arterials (Dean Martin Dr, Tropicana Ave, Valley View
+   Blvd, Russell Rd, Hacienda Ave) are reliably gateways.
+7. **Re-scoped the question.** Gateways are settled, so the mode split is not the
+   headline. What remains is to separate heavy pedestrian corridors from other
+   local access streets, without letting event days skew the answer but still
+   accounting for them. That produced the routine-baseline + event-flag design
+   (section 8d).
+8. **Cadence confound.** Event dates fall mostly in the fall season, and GPS
+   cadence varies by month (median gap about 3 s in Jan-Apr 2025, about 40 s in
+   Jun-Jul 2025, 6-21 s afterwards). Dean Martin Dr showed that the apparent
+   event effect disappears when event days are compared with non-event days
+   from the same season. So the event comparison is month-matched.
+
+### Final design (what the dashboard and outputs mean)
+
+- **Label = ordinary days only.** Event days cannot create a pedestrian label.
+- **Event days = a separate flag**, measured against same-month ordinary days.
+- **Pedestrian share is a relative ranking**, from speed between GPS pings. It
+  is not a count of pedestrians. Even the best arterials read only about 60-65%
+  vehicle.
+- **Uncertainty is shown, not hidden:** streets with under 200 routine
+  observations are `insufficient_data`; thin streets are marked low confidence.
+
+### Results (district-wide run, `--biking-as-wheeled`, 300k legs, seed 0)
+
+| Type | Count | Streets |
+|---|---|---|
+| Gateway | 14 | Dean Martin Dr, W Tropicana Ave, S Valley View Blvd, W Russell Rd, W Hacienda Ave, Polaris Ave, Joey Bishop Dr, W Oquendo Rd, W Sunset Rd, Arville St, Wynn Rd, Diablo Dr, W Post Rd, Allegiant Stadium Way |
+| Pedestrian corridor (routine) | 3 | Al Davis Way (50.4%), Rousso Rd (57.5%), W Patrick Ln (53.3%) |
+| Event-day pedestrian corridor | 1 | Graphic Center Dr (42% routine, 54% event days) |
+| Local street | 12 | Procyon St, Bell Dr, Ali Baba Ln, Ponderosa Way, Schuster St, Quail Ave, ... |
+| Insufficient data | 10 | minor streets below 200 routine observations |
+
+Event-day pedestrian surges (month-matched shift): **Allegiant Stadium Way**
++20.0 pts (gateway, flagged), **Al Davis Way** +16.2 pts, **Graphic Center Dr**
++10.3 pts (weak). All 14 gateways move by under 5 points on event days.
+
+### Caveats to state when presenting this
+
+- Mode is inferred from speed between pings; this cannot cleanly separate slow
+  cars from walkers. Treat shares as relative.
+- Al Davis Way's *routine* label is borderline (50.4% overall, 46.2% in
+  same-month comparison); its event-day surge is the more robust finding.
+- Rousso Rd and W Patrick Ln rest on few observations (332 and 229).
+- Why dense-ping months read less vehicle than sparse-ping months is not
+  established; the month-matched comparison controls for it but does not explain it.
+- Thresholds (50% / 200 / 10 pts / 100) are judgment calls, exposed as flags.
+- Local streets Ali Baba Ln, Ponderosa Way and Oquendo Rd are *less* pedestrian
+  on event days (about -8 to -10 pts), probably event vehicle traffic; not flagged.
+- The merged district polygon has not been split by building.
+
+### Checks that were run
+
+Seed stability (seeds 0 and 2: same 7 gateways, counts within 3%); event vs.
+non-event shifts by street; ping cadence by month; event-skew date
+distribution (42.4% vs. 10.5%); synthetic unit tests for the month-matched
+shift; ACS commute-mode sanity check.
 
 ## 1. Data sources
 
@@ -365,6 +473,157 @@ this is computed automatically whenever that flag is used, and
 `street_classification.json` is written alongside the other street-match
 outputs.
 
+## 8c. Street-type classification uses a broader, district-wide trip population
+
+Every other analysis in this pipeline — `routes.json`, `lot_summary.json`,
+residency, extrapolation, the dashboard's Volume and Residency map modes —
+is built from `find_qualifying_trips()`'s output: a device must have pinged
+inside one of the mapped parking-lot polygons **and** been confirmed at the
+stadium within `--max-post-minutes`. That's the right population for "how
+do people who parked in Lot X get to the stadium," but it's the wrong
+population for "what kind of street is Russell Road": a trip only shows up
+in `routes.json` if a device's post-parking *walk* happened to clip that
+road's sidewalk, because `build_route_sequences` only windows pings between
+the lot-arrival ping and the stadium-confirmation ping. The vehicle itself
+driving in on a gateway road, before ever reaching a mapped lot, never
+appears in that population at all — so a real vehicle gateway with little
+or no pedestrian sidewalk traffic was structurally invisible to the old
+(lot-trip-only) street-type classification, and would misclassify as a
+pedestrian corridor or go unclassified no matter how much real car traffic
+it carried.
+
+Street-TYPE classification (§8b) now runs against a separate, broader
+population instead: `build_district_trajectory_legs()` takes **every**
+device remaining in `pathing` after the pipeline's existing noise/staff/
+high-emittance filtering — not just the lot-and-stadium-qualified ones —
+and splits each device's full ping sequence into separate travel "legs"
+wherever two consecutive pings are more than `--street-type-max-gap-minutes`
+apart (default 20). That gap-split matters: without it, a single device's
+arrival trip, in-stadium dwell, and departure trip would chain into one
+nonsensical polyline spanning wildly different times of day. Because
+Azira's Pathing X report is itself anchored to confirmed stadium visitors,
+this broader population is still "people connected to a stadium visit" —
+just without the additional requirement that they specifically parked in a
+mapped lot — which recovers people who drove through on a gateway road
+without ever pinging inside one of the mapped polygons (parked on-street,
+used an unmapped lot, were dropped off, etc.).
+
+These district-wide legs are snapped onto the street network with the same
+`match_routes_to_street_segments` function the lot-qualified routes use, and
+produce their **own** edge/corridor files — `street_classification_edge_geometries.json`
+and `street_classification_edge_corridors.json` — kept separate from
+`edge_geometries.json`/`edge_corridors.json`, which stay lot-trip-only for
+Volume/Residency. `street_classification.json` itself is then built from
+this broader population's corridor vote tallies, not the lot-trip ones.
+
+**Mode classification for this population uses LOCAL, per-ping modes, not
+one whole-leg label.** `classify_route_mode` (one median-speed label for an
+entire trip, §8b) is the right tool for a lot-qualified route, because that
+route is already bounded to one real activity — the walk from parking to
+the stadium. A district-wide leg is bounded only by a 20-minute ping gap,
+which can span *multiple* real activities on one device without ever
+crossing that gap: drive in on a gateway road, park, then walk around
+tailgating for 15 minutes. Applying one whole-leg median to that leg lets
+the far more numerous slow walking-paced segments later in the leg drag
+the *entire* leg's label to `"walking"` — including the genuinely fast
+driving that happened earlier, on a completely different street — and that
+single mislabeled vote then gets cast for every corridor the leg touched,
+gateways included. This was confirmed on real data: Al Davis Way, Russell
+Road, and Hacienda Avenue — all real vehicle gateways — showed 11:1 to 24:1
+walking-to-car vote ratios under the whole-leg approach, and only 1 of
+3,922 corridors classified as `gateway` district-wide.
+
+The fix: `classify_route_local_modes` assigns each **ping** its own local
+mode, from a small centered rolling median (default 5 ping-to-ping
+segments) of nearby speeds — enough to smooth the same GPS jitter
+`classify_route_mode`'s median was built to resist, small enough that the
+label actually tracks where a leg's real behavior changes. When computing
+`corridor_mode_counts`, `match_routes_to_street_segments` then casts each
+corridor's vote from the local modes of only the pings that snapped to
+*that* corridor's edges, not the leg's single whole-trip mode — so a leg
+that drove on a gateway and later walked elsewhere correctly casts a `car`
+vote on the gateway and `walking` votes wherever it later walked, instead
+of one label for both. A corridor reached only through a bridged gap
+(`bridge_route_gaps` fills in a street-network path between two observed
+points with no ping of its own there) has no local-mode evidence and votes
+`"unknown"` rather than guessing. This local-mode path is used only for
+the district-wide population; the lot-qualified routes' `mode` field in
+`routes.json` is unaffected and still comes from the original
+whole-trip `classify_route_mode`.
+
+Two new flags control this:
+
+- `--street-type-max-gap-minutes` (default `20.0`) — the gap threshold
+  described above. Lower it if a district this compact is chaining
+  obviously-unrelated trips into one leg; raise it if real legs are being
+  cut short.
+- `--street-type-use-lot-trips-only` — an escape hatch back to the old
+  (lot-trip-only) behavior, for when the district-wide pass is too slow for
+  a given machine/network (it processes every remaining device, not just
+  the lot-qualified subset, so it can touch an order of magnitude more
+  trip legs). Using it reproduces the original under-counting of vehicle
+  traffic on gateway roads, so only reach for it as a fallback.
+
+Because the dashboard's Street Type exhibits (§11) now draw from this
+broader population's own edge files, they can show real streets — and real
+gateway/local classifications — that never appear on the Volume or
+Residency maps at all, since those two still reflect only the lot-qualified
+trips.
+
+## 8d. District-wide street typing (standalone script)
+
+`district_wide_street_analysis.py` types streets from a district-wide pathing
+extract (every device near any district building, not just stadium visitors).
+It imports `pathing_pipeline.py`, so run it from the project folder.
+
+```
+python district_wide_street_analysis.py --pathing 10178831_Clark_pathing_x_report.tsv.gz ^
+  --max-legs 300000 --seed 0 --biking-as-wheeled ^
+  --event-calibration output\extrapolation_calibration.json --out district_wide_output_final2
+```
+
+**Population and performance**
+- Per-device travel legs are split on gaps > `--street-type-max-gap-minutes` (20);
+  legs under `--min-leg-pings` (4) are dropped; a seeded sample of `--max-legs`
+  (default 150000; 0 = all) is snapped (`--seed`). The first run on all 1.06M
+  legs never finished because gap bridging ran an uncached, uncapped
+  shortest-path search; it now uses per-source capped searches with a cache
+  (same output as before, roughly 60x faster on the test graph).
+- Corridor votes use per-ping rolling-median local modes; segments longer than
+  60 s are ignored (sparse pings make long-gap speeds meaningless).
+- No staff/employee filtering: with one merged district polygon the
+  repeat-visitor heuristic would flag anyone who lives or works in the district.
+
+**Flags**
+- `--biking-as-wheeled` pools "biking" votes with "car" (assumption, off by
+  default; raw `mode_counts` are always written). Rationale in section 0.
+- `--event-calibration <extrapolation_calibration.json>` supplies event dates for
+  the event / non-event split. Without it everything is treated as baseline.
+- `--ped-share-threshold` (0.50), `--min-baseline-votes` (200),
+  `--event-shift-threshold` (0.10), `--min-event-votes` (100).
+
+**Typing rules** (`refine_street_types`)
+- Gateways come from `classify_street_types` (vehicle-dominant plus a major OSM
+  class: primary / secondary / tertiary / trunk / motorway and their links).
+- Every other public corridor is typed from its **routine (non-event-day)**
+  baseline, so event days cannot skew the label. Pedestrian share =
+  (walking + stationary) / all classified (non-"unknown") votes.
+  - `pedestrian_corridor`: baseline share >= 0.50 with >= 200 baseline votes
+  - `event_pedestrian_corridor`: below that, but event-day share >= 0.50 and
+    >= month-matched baseline + 0.10 (needs >= 100 event votes)
+  - `local_street`: everything else; `insufficient_data`: < 200 baseline votes
+- **Month-matched event comparison.** Event dates sit mostly in the fall season,
+  and GPS ping cadence changes a lot by month, so the event shift compares
+  event days with non-event days from the *same months* (non-event share
+  re-weighted by the event votes' month mix). Output field:
+  `month_matched_baseline_ped_share`. Any street (gateways included) gets
+  `event_pedestrian_flag` when its shift passes the rule.
+
+**Outputs:** `street_classification.json` (base typing),
+`street_classification_refined.json` (final types, routine / event shares, shift,
+flag), edge geometry and corridor files, `date_distribution.json` (event-skew
+check), `mode_summary.json`, `ping_cadence_by_month.json` (data-quality check).
+
 ## 9. Running it
 
 ```bash
@@ -420,61 +679,34 @@ This writes five files to `output/`:
 | `lot_centroids.json` | Lat/lon for each lot (from the real polygon geometry) and the stadium, for map markers |
 | `pipeline_stats.json` | Funnel counts and notes on what was dropped and why |
 | `event_meta.json` | `--event-name` / `--event-type` / `--event-date`, for multi-event comparison |
+| `street_classification.json` | *(only with `--street-match`)* Per-corridor type (gateway/pedestrian_corridor/local_street/unclassified/excluded_private), built from the broader district-wide population — see §8c |
+| `street_classification_edge_geometries.json` / `street_classification_edge_corridors.json` | *(only with `--street-match`, and not `--street-type-use-lot-trips-only`)* The district-wide edge/corridor files `street_classification.json` was actually matched against — kept separate from `edge_geometries.json`/`edge_corridors.json` because the two populations differ (§8c) |
 
 ## 10. Rebuilding the dashboard
 
-`index.html` reads its data from three embedded placeholders in
-`index_template.html`. To refresh it after a new pipeline run:
+`index.html` is generated from `index_template.html` by `build_dashboard.py`:
 
 ```bash
-python3 - <<'EOF'
-import json, os
-
-def load_if_exists(path, default):
-    return json.load(open(path)) if os.path.exists(path) else default
-
-data = {
-    "flow_lines": json.load(open("output/flow_lines.json")),
-    "lot_centroids": json.load(open("output/lot_centroids.json")),
-    "lot_summary": json.load(open("output/lot_summary.json")),
-    "routes": json.load(open("output/routes.json")),
-}
-event_meta = json.load(open("output/event_meta.json"))
-data["event_meta"] = event_meta  # so a saved dashboard_data.json can be
-                                  # loaded into another run's comparison picker
-
-edge_geometries = load_if_exists("output/edge_geometries.json", {})
-edge_corridors = load_if_exists("output/edge_corridors.json", {})
-extrapolation_calibration = load_if_exists("output/extrapolation_calibration.json", {})
-street_classification = load_if_exists("output/street_classification.json", {})
-
-html = open("index_template.html").read()
-html = html.replace("__DASHBOARD_DATA__", json.dumps(data))
-html = html.replace("__EVENT_META__", json.dumps(event_meta))
-html = html.replace("__EDGE_GEOMETRIES__", json.dumps(edge_geometries))
-html = html.replace("__EDGE_CORRIDORS__", json.dumps(edge_corridors))
-html = html.replace("__EXTRAPOLATION_CALIBRATION__", json.dumps(extrapolation_calibration))
-html = html.replace("__STREET_CLASSIFICATION__", json.dumps(street_classification))
-open("index.html", "w").write(html)
-
-# Also save a standalone bundle -- this is the file to hand to the
-# "Compare against another event" picker in a *different* game's dashboard.
-json.dump(data, open("output/dashboard_data.json", "w"))
-EOF
+python3 build_dashboard.py
 ```
 
-**All six placeholders must be replaced** — `index_template.html` has no
-default values baked in, so any one left as a literal `__PLACEHOLDER__`
-string breaks the page's JavaScript on load. If a particular output file
-doesn't exist (e.g. `output/edge_geometries.json` and
-`output/street_classification.json` when `--street-match` wasn't used for
-this run), its placeholder is still replaced — with `{}` — rather than
-left untouched; the dashboard's JS checks for an empty object and degrades
-gracefully (straight-line GPS-interpolated routes instead of real street
-segments, no "Street Type" map mode) with a banner explaining why, rather
-than erroring.
+It reads two folders:
+- `output/` — the event-anchored, lot-qualified run (`flow_lines`, `lot_centroids`,
+  `lot_summary`, `routes`, `event_meta`, `edge_geometries`, `edge_corridors`,
+  `extrapolation_calibration`). This feeds the **Volume** and **Local vs. Visitor** maps.
+- `district_final/` — the district-wide run from section 8d
+  (`street_classification.json`, `street_classification_refined.json`,
+  `street_classification_edge_geometries.json`,
+  `street_classification_edge_corridors.json`). This feeds both **Street Type**
+  maps. The script merges the refined type, routine / event shares and event flag
+  onto each corridor.
 
-Open `index.html` directly in a browser — no server required.
+**All eight placeholders in the template must be replaced**; one left as a
+literal `__PLACEHOLDER__` breaks the page's JavaScript. The build script
+asserts this. Missing optional files become `{}` and the dashboard degrades
+gracefully (straight-line paths, no Street Type modes) with a banner.
+It also writes `output/dashboard_data.json`, the bundle another game's
+dashboard can load in its comparison picker.
 
 ## 11. The interface
 
@@ -496,19 +728,25 @@ Open `index.html` directly in a browser — no server required.
   inbound or outbound traffic for the current filter. Without street-match
   data, the map falls back to straight-line GPS-interpolated routes
   automatically, with a banner explaining why.
-- **Street Type mode** (third option in the Volume / Local vs. Visitor
-  toggle): colors each real public street by its classification from
-  `street_classification.json` — gateway (red-orange), pedestrian corridor
-  (teal), or local street (violet) — per §8b. Parking-lot aisles,
-  driveways, and footways aren't drawn in this mode at all (they're
+- **Street Type: Vehicle / Street Type: Pedestrian** (two separate options
+  in the map-mode toggle, after Volume / Local vs. Visitor): colors each
+  real public street by its classification from `street_classification.json`
+  — gateway (red-orange), pedestrian corridor (teal), or local street
+  (violet) — per §8b/§8c. These are two deliberately separate exhibits, not
+  one shared view: vehicle-street trip counts run far higher than
+  pedestrian-corridor counts, so a shared volume/line-weight scale would
+  make the pedestrian corridors invisible. Each exhibit scales its own line
+  weight only against the busiest corridor *within that exhibit*. Parking-
+  lot aisles, driveways, and footways aren't drawn in either mode (they're
   excluded from the classification entirely, not just hidden). A corridor
   whose type rests on too little evidence (fewer than 5 trip-votes, or a
   tie between two modes) is drawn dashed and dimmer rather than with the
   same solid confidence as a well-sampled street — hover any segment for
-  its dominant mode, vote count, and confidence. A **mode filter** (All /
-  🚶 Walking / 🚲 Biking / 🚗 Car) sits just below the direction filter and
-  restricts every map/chart consumer to trips of that travel mode, same as
-  the existing direction filter.
+  its dominant mode, vote count, and confidence. Both exhibits are built
+  from the broader district-wide trip population (§8c), not the lot-
+  qualified population the mode filter/top-20 highlight/share-of-trips
+  toggle operate on, so those three controls hide automatically while
+  either Street Type exhibit is active.
 - **Busiest entry points**: a ranked bar chart of the street segments where
   inbound trips first enter the mapped network — click a bar to fly the map
   to that segment. Requires street-match data.
@@ -521,6 +759,12 @@ Open `index.html` directly in a browser — no server required.
   the file picker to overlay its time-to-stadium distribution on the
   histogram — e.g. comparing a Raiders home game against a concert once both
   have been processed.
+
+### Reading each map (also summarized on the dashboard)
+
+- **Volume / Local vs. Visitor:** stadium-anchored walk-in trips, mostly event days.
+- **Street Type: Vehicle / Pedestrian:** district-wide extract; labels from ordinary days; amber marks an event-day pedestrian surge measured against same-month ordinary days.
+- The dashboard shows a short explainer under the map that changes with the selected map, and a "Method" section above the footer covering the two populations, why we use two, how streets are typed, how event days are handled, and the limits.
 
 ## 12. Known limitations
 
