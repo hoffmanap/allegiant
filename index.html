@@ -125,6 +125,7 @@ h1.title{font-family:var(--display);font-weight:800;font-size:clamp(2.6rem,7.5vw
 
 .map-zone{position:relative;flex:1 1 auto;min-height:260px;}
 #map{position:absolute;inset:0;background:#e9e6da;}
+.leaflet-tile-pane{filter:grayscale(.85) contrast(.82) brightness(1.08);}
 .leaflet-tooltip{font-family:var(--body);font-size:.85rem;line-height:1.4;color:var(--ink);background:var(--panel);border:1px solid var(--ink);border-radius:6px;box-shadow:3px 3px 0 var(--hi);}
 .fs-btn{position:absolute;top:.6rem;right:.6rem;z-index:500;}
 .street-match-note{position:absolute;top:.8rem;left:3.4rem;z-index:500;background:var(--ink);border-radius:8px;padding:.6rem .8rem;font-family:var(--mono);font-size:.68rem;color:#fff;max-width:260px;display:none;}
@@ -642,8 +643,10 @@ const map = L.map('map', {zoomControl:true, scrollWheelZoom:true})
 // .leaflet-tile-pane in <style>), which leaves the route overlays --
 // polylines, markers, the whole leaflet-overlay-pane -- completely
 // unaffected since that's a separate Leaflet pane.
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution:'&copy; OpenStreetMap contributors &copy; CARTO', subdomains:'abcd', maxZoom:19
+// Plain OpenStreetMap tiles: no API key required (CARTO basemaps now ask for one).
+// The muted, light look is a CSS filter on the tile pane only (.leaflet-tile-pane).
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; OpenStreetMap contributors', maxZoom:19
 }).addTo(map);
 
 L.circleMarker([stadium.lat, stadium.lon], {
