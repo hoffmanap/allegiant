@@ -266,8 +266,8 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
     <h3>How to use the page</h3>
     <dl>
       <dt>Scroll</dt><dd>The text on the left drives the map on the right. The map stays in view.</dd>
-      <dt>View</dt><dd>Switch the map between <b>Volume</b>, <b>Local vs. Visitor</b> and <b>Street Roles</b>.</dd>
-      <dt>Filters</dt><dd>Open the drawer under the map to narrow by <b>date or event type</b> (Raiders, UNLV, concerts), <b>parking lot</b>, and <b>residency</b> (locals vs. visitors). They apply to the two walk-in views.</dd>
+      <dt>View</dt><dd>Switch the map between <b>Volume</b>, <b>Local vs. Visitor</b>, <b>Approach Routes</b> (hides the stadium core to show the streets that feed it) and <b>Street Roles</b>.</dd>
+      <dt>Filters</dt><dd>Open the drawer under the map to narrow by <b>date or event type</b> (Raiders, UNLV, concerts), <b>parking lot</b>, and <b>residency</b> (locals vs. visitors). They apply to the three walk-in views.</dd>
       <dt>Direction &amp; mode</dt><dd>Show only trips <b>to</b> or <b>from</b> the stadium, or only walking, biking or car trips.</dd>
       <dt>Hover</dt><dd>Any street shows its numbers. In Street Roles, click a legend row to isolate one role.</dd>
     </dl>
@@ -304,8 +304,15 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
       <p>Filtered to <span class="mark">visitors</span>. Compare with the all-trips view in step 01. The time-to-stadium chart in the numbers below shows whether visitor trips run longer.</p>
     </div>
 
+    <div class="step" data-mode="approach" data-lots="all" data-residency="all">
+      <p class="eyebrow">05 · Beyond the core</p>
+      <h2>Cut out the crowd at the stadium door</h2>
+      <p>Most of the signal in the first maps sits right around the stadium, where everyone ends up. This view <span class="mark">hides every street inside the dashed box</span> bounded by Hacienda, Polaris, Russell and Dean Martin, and keeps those four streets visible.</p>
+      <p>Colors scale to the busiest street beyond those four, so the streets that actually <span class="mark">feed the core</span> stand out. Use the Entry ranking in the numbers section to see where trips cross in.</p>
+    </div>
+
     <div class="step" data-mode="street_roles" data-role="" data-lots="all" data-residency="all">
-      <p class="eyebrow">05 · From routes to street roles</p>
+      <p class="eyebrow">06 · From routes to street roles</p>
       <h2>Now give every street a job</h2>
       <p>The map switches to a single view of the whole district. The logic is deliberately simple:</p>
       <ul>
@@ -317,14 +324,14 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
     </div>
 
     <div class="step" data-mode="street_roles" data-role="gateway" data-lots="all" data-residency="all">
-      <p class="eyebrow">06 · Gateways</p>
+      <p class="eyebrow">07 · Gateways</p>
       <h2><span data-fill="n-gateway">–</span> arterials carry people in and out</h2>
       <p>OpenStreetMap motorway, trunk, primary and secondary roads: <span data-fill="gateway-names">–</span>. These are designed to move people and vehicles through the district edge, not to be walked.</p>
       <div class="callout"><b>Dual role.</b> <span data-fill="dual-names">–</span> is an arterial that is also a major walk-in route. It keeps the gateway role and is flagged in its tooltip.</div>
     </div>
 
     <div class="step" data-mode="street_roles" data-role="pedestrian_corridor" data-lots="all" data-residency="all">
-      <p class="eyebrow">07 · Pedestrian streets</p>
+      <p class="eyebrow">08 · Pedestrian streets</p>
       <h2>Streets where people on foot dominate</h2>
       <p>A non-arterial becomes a pedestrian street only if it passes <b>both</b> tests:</p>
       <ul>
@@ -335,20 +342,20 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
     </div>
 
     <div class="step" data-mode="street_roles" data-role="local_street" data-lots="all" data-residency="all">
-      <p class="eyebrow">08 · Local streets</p>
+      <p class="eyebrow">09 · Local streets</p>
       <h2>Everything else needs only minimal treatment</h2>
       <p><span data-fill="n-local">–</span> streets are access streets. Thin-data streets are drawn <span class="mark">dashed</span> to signal low confidence. Parking aisles, driveways and footways are left out.</p>
     </div>
 
     <div class="step" data-mode="street_roles" data-role="event" data-lots="all" data-residency="all">
-      <p class="eyebrow">09 · Event-day surges</p>
+      <p class="eyebrow">10 · Event-day surges</p>
       <h2>Game days are flagged, never decisive</h2>
       <p>A yellow halo marks a street that is at least <span class="mark">10 points more pedestrian on event days than on ordinary days from the same months</span>. Matching months matters because GPS ping frequency changes a lot through the year.</p>
       <p>The halo is information for event operations. It never changes a street's role.</p>
     </div>
 
     <div class="step" data-mode="street_roles" data-role="" data-lots="all" data-residency="all" id="step-explore">
-      <p class="eyebrow">10 · Your turn</p>
+      <p class="eyebrow">11 · Your turn</p>
       <h2>Explore it yourself</h2>
       <p>Open the <b>Filters</b> drawer under the map to narrow by date, event type, lot or residency, then scroll down for the numbers behind the map. The method section at the bottom covers the data and its limits.</p>
       <button class="step-cta" id="open-filters-btn">Open filters ↗</button>
@@ -362,6 +369,7 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
       <div class="seg" id="map-mode-toggle" role="tablist" aria-label="Map view">
         <button data-mode="volume" class="active">Volume</button>
         <button data-mode="residency">Local vs. Visitor</button>
+        <button data-mode="approach">Approach Routes</button>
         <button data-mode="street_roles">Street Roles</button>
       </div>
       <button class="pill-btn tour-pill" id="tour-pill">● Guided tour</button>
@@ -450,7 +458,7 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
 <section class="numbers" id="numbers">
   <p class="eyebrow">The numbers behind the walk-in maps</p>
   <h2>What the current filters add up to</h2>
-  <p class="lede">These charts follow the filters in the drawer under the map (date, event type, lots, residency). <a href="#story">Back to the map</a> to change them. Street Roles is district-wide and does not use these filters.</p>
+  <p class="lede">These charts follow the filters in the drawer under the map (date, event type, lots, residency). <a href="#story">Back to the map</a> to change them. Street Roles is district-wide and does not use these filters. In Approach Routes, trips that stay entirely inside the core are left out.</p>
 
   <div class="hud">
     <div class="hud-row"><span>Devices</span><b id="hud-devices">–</b></div>
@@ -514,7 +522,7 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
 
   <div class="method-grid">
     <div class="method-card">
-      <span class="tag">Volume · Local vs. Visitor</span>
+      <span class="tag">Volume · Local vs. Visitor · Approach Routes</span>
       <h3>The walk in from parking</h3>
       <p><b>Question:</b> which streets do people use to get from a parking lot to the stadium, and how long does it take?</p>
       <p><b>Population:</b> only devices seen in a mapped parking lot and then at the stadium. It mostly reflects <b>event days</b> and walkers. These are the preferred walking routes that back every pedestrian-street designation.</p>
@@ -805,6 +813,56 @@ function computeLiveLotSummary(){
 /* but recomputed client-side per filter change so lot/residency     */
 /* selection actually affects the segment volumes shown.             */
 /* ============================================================== */
+
+/* ============================================================== */
+/* STADIUM CORE (Approach Routes view)                               */
+/* Box bounded by Hacienda (north), Polaris (west), Russell (south)  */
+/* and Dean Martin (east, follows the road's curve). The four        */
+/* boundary streets stay visible; every other edge inside is hidden.  */
+/* ============================================================== */
+const CORE_BOUNDARY_NAMES = ['West Hacienda Avenue','Polaris Avenue','West Russell Road','Dean Martin Drive'];
+let CORE_POLY = null;           // [[lat,lon],...] or null if boundary streets are missing
+const coreInternalCache = new Map();
+function medianOf(a){ const t=[...a].sort((x,y)=>x-y); return t.length ? t[Math.floor(t.length/2)] : null; }
+function buildCorePolygon(){
+  const ptsOf = (name)=> (CORRIDOR_TO_EDGES[name] || []).flatMap(k=>EDGE_GEOMETRIES[k] || []);
+  const hac = ptsOf('West Hacienda Avenue'), pol = ptsOf('Polaris Avenue'),
+        rus = ptsOf('West Russell Road'), dm = ptsOf('Dean Martin Drive');
+  if(!hac.length || !pol.length || !rus.length || !dm.length) return null;
+  const N = medianOf(hac.map(p=>p[0])), S = medianOf(rus.map(p=>p[0])), W = medianOf(pol.map(p=>p[1]));
+  // east boundary: Dean Martin between S and N, one median point per latitude bin
+  const bins = new Map();
+  dm.filter(p=>p[0] >= S && p[0] <= N).forEach(p=>{
+    const b = Math.round(p[0] / 0.0004);
+    if(!bins.has(b)) bins.set(b, []);
+    bins.get(b).push(p);
+  });
+  const east = [...bins.entries()].sort((a,b)=>b[0]-a[0]).map(([b,arr])=>[medianOf(arr.map(p=>p[0])), medianOf(arr.map(p=>p[1]))]);
+  if(east.length < 2) return null;
+  return [[N, W], [N, east[0][1]], ...east, [S, east[east.length-1][1]], [S, W]];
+}
+function pointInPoly(lat, lon, poly){
+  let inside = false;
+  for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const yi=poly[i][0], xi=poly[i][1], yj=poly[j][0], xj=poly[j][1];
+    if(((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function isCoreInternalEdge(key){
+  if(!CORE_POLY) return false;
+  if(coreInternalCache.has(key)) return coreInternalCache.get(key);
+  const g = EDGE_GEOMETRIES[key];
+  let res = false;
+  if(g && g.length && CORE_BOUNDARY_NAMES.indexOf(EDGE_CORRIDORS[key]) < 0){
+    const m = g[Math.floor(g.length/2)];
+    res = pointInPoly(m[0], m[1], CORE_POLY);
+  }
+  coreInternalCache.set(key, res);
+  return res;
+}
+let lastApproachSkipped = 0;
+
 function computeSegmentAggregates(lots, residencyFilter){
   // Two levels: `edgeDir` tracks direction counts per REAL edge (so the
   // animated flow direction stays accurate to the specific lane a device
@@ -818,6 +876,8 @@ function computeSegmentAggregates(lots, residencyFilter){
   const corridorStats = new Map(); // corridor -> {total, local, visitor, unknown, sumMinutes}
   const entryCounter = new Map();  // corridor -> {total, local, visitor, unknown}
   const exitCounter = new Map();
+  const approachMode = mapMode === 'approach' && !!CORE_POLY;
+  lastApproachSkipped = 0;
   let totalFilteredLegs = 0, totalFilteredToStadium = 0, totalFilteredFromStadium = 0;
 
   PRIMARY_DATA.routes.forEach(r=>{
@@ -826,11 +886,15 @@ function computeSegmentAggregates(lots, residencyFilter){
     if(directionFilter !== 'all' && r.direction !== directionFilter) return;
     if(modeFilter !== 'all' && r.mode !== modeFilter) return;
     if(!passesDateFilter(r)) return;
-    totalFilteredLegs++;
-    if(r.direction === 'to_stadium') totalFilteredToStadium++; else totalFilteredFromStadium++;
     const edges = r.matched_edges || [];
     const uniqueEdgesInOrder = [];
-    edges.forEach(e=>{ if(uniqueEdgesInOrder[uniqueEdgesInOrder.length-1] !== e) uniqueEdgesInOrder.push(e); });
+    edges.forEach(e=>{
+      if(approachMode && isCoreInternalEdge(e)) return; // Approach Routes: hide everything inside the core
+      if(uniqueEdgesInOrder[uniqueEdgesInOrder.length-1] !== e) uniqueEdgesInOrder.push(e);
+    });
+    if(approachMode && !uniqueEdgesInOrder.some(k=>EDGE_GEOMETRIES[k])){ lastApproachSkipped++; return; } // never left the core
+    totalFilteredLegs++;
+    if(r.direction === 'to_stadium') totalFilteredToStadium++; else totalFilteredFromStadium++;
 
     uniqueEdgesInOrder.forEach(key=>{
       if(!EDGE_GEOMETRIES[key]) return;
@@ -861,13 +925,13 @@ function computeSegmentAggregates(lots, residencyFilter){
     });
 
     if(r.direction === 'to_stadium' && corridorSeq.length){
-      const c = corridorSeq[0]; // entry: first corridor an inbound trip touches
+      const c = approachMode ? corridorSeq[corridorSeq.length - 1] : corridorSeq[0]; // entry: first corridor an inbound trip touches (Approach Routes: last street before the core)
       if(!entryCounter.has(c)) entryCounter.set(c, {total:0, local:0, visitor:0, unknown:0});
       const ent = entryCounter.get(c);
       ent.total++; ent[resBucket]++;
     }
     if(r.direction === 'from_stadium' && corridorSeq.length){
-      const c = corridorSeq[corridorSeq.length - 1]; // exit: last corridor an outbound (return) trip touches
+      const c = approachMode ? corridorSeq[0] : corridorSeq[corridorSeq.length - 1]; // exit: last corridor an outbound trip touches (Approach Routes: first street after the core)
       if(!exitCounter.has(c)) exitCounter.set(c, {total:0, local:0, visitor:0, unknown:0});
       const ext = exitCounter.get(c);
       ext.total++; ext[resBucket]++;
@@ -929,7 +993,7 @@ function median(arr){
   return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 
-let mapMode = 'volume'; // 'volume' | 'residency' | 'street_roles'
+let mapMode = 'volume'; // 'volume' | 'residency' | 'approach' | 'street_roles'
 let roleFocus = null; // null | 'gateway' | 'pedestrian_corridor' | 'local_street' | 'event'
 // Street Roles is one consolidated map: gateway / pedestrian street / local street, with an
 // event-day surge halo, scaled per role (see renderStreetRoles).
@@ -966,6 +1030,8 @@ const MODE_EXPLAINERS = {
     'Each line is a street segment between a mapped parking lot and the stadium. Thicker and redder means more devices. Built from stadium trips, so it mostly reflects event days and people on foot.'],
   residency: ['Local vs. Visitor.',
     'The same stadium trips, colored by whether the device\'s common evening location is in the Las Vegas metro (teal) or elsewhere (violet).'],
+  approach: ['Approach Routes.',
+    'The same stadium trips with every street inside the dashed core box hidden (the box is bounded by Hacienda, Polaris, Russell and Dean Martin, which stay visible). Colors scale to the busiest street beyond the four boundary streets (the boundary streets simply saturate), so you can see which streets feed the core. Trips that never leave the core are left out.'],
   street_roles: ['Street Roles.',
     'Every public street in the district gets one role, using all devices near any district building on all days. Click a legend row to isolate a role. Dashed lines have thin data. Yellow halo = event-day surge.'],
 };
@@ -1024,6 +1090,7 @@ function renderStreetSegments(lots, residencyFilter){
     renderStreetRoles();
     return;
   }
+  if(mapMode === 'approach' && !CORE_POLY){ document.getElementById('mode-explainer').innerHTML = '<span class="me-title">Approach Routes.</span>The four boundary streets were not found in this export, so the core box cannot be drawn.'; }
 
   const {
     touchedEdges, edgeDir, corridorStats, entryPoints, exitPoints, corridorBounds,
@@ -1037,7 +1104,13 @@ function renderStreetSegments(lots, residencyFilter){
   lastTotalToStadium = totalFilteredToStadium;
   lastTotalFromStadium = totalFilteredFromStadium;
 
-  const maxTotal = Math.max(1, ...[...corridorStats.values()].map(s=>s.total));
+  let maxTotal = Math.max(1, ...[...corridorStats.values()].map(s=>s.total));
+  if(mapMode === 'approach'){
+    // Scale to the busiest street that is NOT one of the four boundary streets, so the
+    // approach streets beyond them stay readable; the boundary streets simply saturate.
+    const others = [...corridorStats.entries()].filter(([c])=>CORE_BOUNDARY_NAMES.indexOf(c) < 0).map(([,v])=>v.total);
+    if(others.length) maxTotal = Math.max(1, ...others);
+  }
   const top20 = computeTop20Corridors(corridorStats, corridorBounds);
   const top20Set = new Set(top20.map(c=>c.corridor));
 
@@ -1054,9 +1127,9 @@ function renderStreetSegments(lots, residencyFilter){
       const diff = denom ? (cs.local - cs.visitor) / denom : 0;
       color = residencyDiffColor(diff);
     } else {
-      color = volumeColor(cs.total / maxTotal);
+      color = volumeColor(Math.min(1, cs.total / maxTotal));
     }
-    let weight = scaledWeight(cs.total / maxTotal);
+    let weight = scaledWeight(Math.min(1, cs.total / maxTotal));
     const isTop20 = top20Highlight && top20Set.has(corridor);
     const dashClass = dir.to_count >= dir.from_count ? 'flow-to-stadium' : 'flow-from-stadium';
 
@@ -1081,7 +1154,18 @@ function renderStreetSegments(lots, residencyFilter){
       );
   });
 
+  if(mapMode === 'approach' && CORE_POLY){
+    L.polygon(CORE_POLY, {color:'#17160f', weight:2, dashArray:'8,6', fillColor:'#17160f', fillOpacity:.07, interactive:true})
+      .addTo(routeLayer)
+      .bindTooltip('<b>Stadium core</b><br>Streets inside this box are hidden. Hacienda, Polaris, Russell and Dean Martin stay visible.');
+    const ex = document.getElementById('mode-explainer');
+    ex.innerHTML += ' <b>' + lastTotalLegs.toLocaleString() + '</b> trips reach streets outside the core; ' + lastApproachSkipped.toLocaleString() + ' stay entirely inside and are left out.';
+  }
   renderRankedPointsChart();
+  if(mapMode === 'approach'){
+    const ne = document.getElementById('entry-points-note');
+    ne.textContent += ' Approach Routes: "Entry" is the last street outside the core before an inbound trip crosses in; "Exit" is the first street outside after leaving.';
+  }
   updateColorLegend(maxTotal);
 }
 
@@ -1248,9 +1332,9 @@ function updateColorLegend(maxTotal, streetRoles){
   flows.style.display = '';
   categorical.classList.remove('visible');
 
-  if(mapMode === 'volume'){
+  if(mapMode === 'volume' || mapMode === 'approach'){
     ramp.className = 'ramp';
-    label.textContent = shareMode ? 'Share of trips per street' : 'Estimated people per street';
+    label.textContent = (mapMode === 'approach' ? 'Outside the core (scaled to busiest non-boundary street): ' : '') + (shareMode ? 'share of trips per street' : 'estimated people per street');
     minEl.textContent = shareMode ? '0%' : fmtCount(0, lastTotalLegs);
     maxEl.textContent = fmtCount(maxTotal, lastTotalLegs);
   } else {
@@ -1985,6 +2069,7 @@ document.getElementById('tour-pill').addEventListener('click', ()=>{
 /* ============================================================== */
 /* INITIAL RENDER                                                    */
 /* ============================================================== */
+CORE_POLY = buildCorePolygon();
 fillNarrativeCallouts();
 steps[0] && steps[0].classList.add('is-active');
 renderMap('all', 'all');

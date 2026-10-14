@@ -760,7 +760,19 @@ dashboard can load in its comparison picker.
   inbound or outbound traffic for the current filter. Without street-match
   data, the map falls back to straight-line GPS-interpolated routes
   automatically, with a banner explaining why.
-- **Street Roles** (third option in the map-view toggle): one consolidated
+- **Approach Routes** (third option in the map-view toggle): the same
+  stadium-anchored trips as Volume, with every street *inside the stadium
+  core* hidden. The core is a polygon bounded by West Hacienda Avenue (north),
+  Polaris Avenue (west), West Russell Road (south) and Dean Martin Drive
+  (east, following the road's curve); it is built in the browser from those
+  four corridors' geometry. The four boundary streets stay visible; an edge is
+  hidden when its midpoint falls inside the polygon and it is not one of them.
+  Trips with no street outside the core are left out and counted in the
+  explainer. Line color and weight scale to the busiest street that is not a
+  boundary street (the boundary streets saturate), and the Entry/Exit ranking
+  becomes the last street outside the core before an inbound trip crosses in
+  (first street after leaving, for outbound). All walk-in filters still apply.
+- **Street Roles** (fourth option in the map-view toggle): one consolidated
   map that colors every real public street by its role from
   `street_classification.json` — gateway (blue), pedestrian street (pink),
   local street (grey) — per §8b/§8c. Line weight is scaled within each role
