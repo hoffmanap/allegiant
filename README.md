@@ -767,9 +767,13 @@ dashboard can load in its comparison picker.
   (east, following the road's curve); it is built in the browser from those
   four corridors' geometry. The four boundary streets stay visible; an edge is
   hidden when its midpoint falls inside the polygon and it is not one of them.
-  Trips with no street outside the core are left out and counted in the
-  explainer. Line color and weight scale to the busiest street that is not a
-  boundary street (the boundary streets saturate), and the Entry/Exit ranking
+  Only named public streets are drawn (the same set street typing uses: lot
+  aisles, driveways, footpaths and unnamed OSM links are dropped). Trips with
+  no such street outside the core are left out and counted in the explainer.
+  Approach Routes colors streets in five quantile classes by default (equal
+  numbers of streets per class, so the ranking shows rather than only the
+  biggest roads); Volume uses the smooth ramp by default. A "Color classes /
+  Smooth color" button flips either view. The Entry/Exit ranking
   becomes the last street outside the core before an inbound trip crosses in
   (first street after leaving, for outbound). All walk-in filters still apply.
 - **Street Roles** (fourth option in the map-view toggle): one consolidated

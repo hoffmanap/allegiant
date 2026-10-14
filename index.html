@@ -308,7 +308,7 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
       <p class="eyebrow">05 · Beyond the core</p>
       <h2>Cut out the crowd at the stadium door</h2>
       <p>Most of the signal in the first maps sits right around the stadium, where everyone ends up. This view <span class="mark">hides every street inside the dashed box</span> bounded by Hacienda, Polaris, Russell and Dean Martin, and keeps those four streets visible.</p>
-      <p>Colors scale to the busiest street beyond those four, so the streets that actually <span class="mark">feed the core</span> stand out. Use the Entry ranking in the numbers section to see where trips cross in.</p>
+      <p>Only named public streets are drawn, and colors split them into five equal-sized classes by volume, so the streets that actually <span class="mark">feed the core</span> stand out instead of just the biggest roads. Use the Entry ranking in the numbers section to see where trips cross in.</p>
     </div>
 
     <div class="step" data-mode="street_roles" data-role="" data-lots="all" data-residency="all">
@@ -385,6 +385,7 @@ footer{max-width:900px;margin:0 auto;padding:5vh 6vw 10vh;color:var(--muted);fon
           <button data-trip-mode="biking">Biking</button>
           <button data-trip-mode="car">Car</button>
         </div>
+        <button class="pill-btn" id="class-toggle">▭ Smooth color</button>
         <button class="pill-btn" id="top20-toggle">☆ Top 20 streets</button>
         <button class="pill-btn" id="share-mode-toggle">% Share of trips</button>
         <button class="pill-btn" id="flow-pause-toggle">⏸ Pause flow</button>
@@ -820,6 +821,13 @@ function computeLiveLotSummary(){
 /* and Dean Martin (east, follows the road's curve). The four        */
 /* boundary streets stay visible; every other edge inside is hidden.  */
 /* ============================================================== */
+// Approach Routes shows only named public streets (the same set the street typing uses);
+// lot aisles, driveways, footpaths and unnamed OSM links are dropped.
+function isNamedPublicCorridor(c){
+  const cls = STREET_CLASSIFICATION[c];
+  if(cls) return cls.type !== 'excluded_private';
+  return !!c && !/ near |\(\d+\)$|^Unnamed/.test(c);
+}
 const CORE_BOUNDARY_NAMES = ['West Hacienda Avenue','Polaris Avenue','West Russell Road','Dean Martin Drive'];
 let CORE_POLY = null;           // [[lat,lon],...] or null if boundary streets are missing
 const coreInternalCache = new Map();
@@ -863,6 +871,31 @@ function isCoreInternalEdge(key){
 }
 let lastApproachSkipped = 0;
 
+/* ============================================================== */
+/* CLASSED SYMBOLOGY (quantile breaks) for Volume / Approach Routes   */
+/* ============================================================== */
+// Per view: Approach Routes defaults to 5 quantile classes (few streets, so the ranking is the story);
+// Volume defaults to the smooth ramp (hundreds of segments packed around the stadium saturate under equal-count classes).
+const classModeByView = {volume:false, approach:true};
+let classMode = false; // resolved per render from classModeByView
+const CLASS_COLORS = ['#f1dc7b','#f4b13f','#ea7a2c','#cc3b2a','#7d1230'];
+const CLASS_WEIGHTS = [3, 4.5, 6.5, 8.5, 11];
+let lastClasses = [];
+function computeClassBreaks(values, k=5){
+  const v = values.filter(x=>x>0).sort((a,b)=>a-b);
+  if(!v.length) return [];
+  const th = [];
+  for(let i=1;i<k;i++){
+    const t = v[Math.max(0, Math.ceil(i*v.length/k) - 1)];
+    if(t < v[v.length-1] && (!th.length || t > th[th.length-1])) th.push(t);
+  }
+  return th;
+}
+function classIndex(total, th){
+  for(let j=0;j<th.length;j++) if(total <= th[j]) return j;
+  return th.length;
+}
+
 function computeSegmentAggregates(lots, residencyFilter){
   // Two levels: `edgeDir` tracks direction counts per REAL edge (so the
   // animated flow direction stays accurate to the specific lane a device
@@ -889,7 +922,7 @@ function computeSegmentAggregates(lots, residencyFilter){
     const edges = r.matched_edges || [];
     const uniqueEdgesInOrder = [];
     edges.forEach(e=>{
-      if(approachMode && isCoreInternalEdge(e)) return; // Approach Routes: hide everything inside the core
+      if(approachMode && (isCoreInternalEdge(e) || !isNamedPublicCorridor(EDGE_CORRIDORS[e]))) return; // Approach Routes: hide the core interior and anything that is not a named public street
       if(uniqueEdgesInOrder[uniqueEdgesInOrder.length-1] !== e) uniqueEdgesInOrder.push(e);
     });
     if(approachMode && !uniqueEdgesInOrder.some(k=>EDGE_GEOMETRIES[k])){ lastApproachSkipped++; return; } // never left the core
@@ -1031,7 +1064,7 @@ const MODE_EXPLAINERS = {
   residency: ['Local vs. Visitor.',
     'The same stadium trips, colored by whether the device\'s common evening location is in the Las Vegas metro (teal) or elsewhere (violet).'],
   approach: ['Approach Routes.',
-    'The same stadium trips with every street inside the dashed core box hidden (the box is bounded by Hacienda, Polaris, Russell and Dean Martin, which stay visible). Colors scale to the busiest street beyond the four boundary streets (the boundary streets simply saturate), so you can see which streets feed the core. Trips that never leave the core are left out.'],
+    'The same stadium trips from mapped parking lots to the stadium, with every street inside the dashed core box hidden (bounded by Hacienda, Polaris, Russell and Dean Martin, which stay visible) and only named public streets drawn. Streets are split into five equal-sized classes by volume, so the story is the ranking, not just the biggest roads. Trips that never reach a public street outside the core are left out.'],
   street_roles: ['Street Roles.',
     'Every public street in the district gets one role, using all devices near any district building on all days. Click a legend row to isolate a role. Dashed lines have thin data. Yellow halo = event-day surge.'],
 };
@@ -1104,12 +1137,13 @@ function renderStreetSegments(lots, residencyFilter){
   lastTotalToStadium = totalFilteredToStadium;
   lastTotalFromStadium = totalFilteredFromStadium;
 
-  let maxTotal = Math.max(1, ...[...corridorStats.values()].map(s=>s.total));
-  if(mapMode === 'approach'){
-    // Scale to the busiest street that is NOT one of the four boundary streets, so the
-    // approach streets beyond them stay readable; the boundary streets simply saturate.
-    const others = [...corridorStats.entries()].filter(([c])=>CORE_BOUNDARY_NAMES.indexOf(c) < 0).map(([,v])=>v.total);
-    if(others.length) maxTotal = Math.max(1, ...others);
+  classMode = !!classModeByView[mapMode];
+  const maxTotal = Math.max(1, ...[...corridorStats.values()].map(s=>s.total));
+  const classThresholds = (classMode && mapMode !== 'residency') ? computeClassBreaks([...corridorStats.values()].map(s=>s.total)) : null;
+  lastClasses = [];
+  if(classThresholds){
+    for(let j=0;j<=classThresholds.length;j++) lastClasses.push({n:0, lo: j ? classThresholds[j-1] : 0, hi: j < classThresholds.length ? classThresholds[j] : maxTotal});
+    corridorStats.forEach(cs=>{ lastClasses[classIndex(cs.total, classThresholds)].n++; });
   }
   const top20 = computeTop20Corridors(corridorStats, corridorBounds);
   const top20Set = new Set(top20.map(c=>c.corridor));
@@ -1126,10 +1160,15 @@ function renderStreetSegments(lots, residencyFilter){
       const denom = cs.local + cs.visitor;
       const diff = denom ? (cs.local - cs.visitor) / denom : 0;
       color = residencyDiffColor(diff);
+    } else if(classThresholds){
+      color = CLASS_COLORS[Math.min(CLASS_COLORS.length-1, classIndex(cs.total, classThresholds) + (CLASS_COLORS.length - 1 - classThresholds.length))];
     } else {
       color = volumeColor(Math.min(1, cs.total / maxTotal));
     }
     let weight = scaledWeight(Math.min(1, cs.total / maxTotal));
+    if(classThresholds && mapMode !== 'residency'){
+      weight = CLASS_WEIGHTS[Math.min(CLASS_WEIGHTS.length-1, classIndex(cs.total, classThresholds) + (CLASS_WEIGHTS.length - 1 - classThresholds.length))];
+    }
     const isTop20 = top20Highlight && top20Set.has(corridor);
     const dashClass = dir.to_count >= dir.from_count ? 'flow-to-stadium' : 'flow-from-stadium';
 
@@ -1159,7 +1198,7 @@ function renderStreetSegments(lots, residencyFilter){
       .addTo(routeLayer)
       .bindTooltip('<b>Stadium core</b><br>Streets inside this box are hidden. Hacienda, Polaris, Russell and Dean Martin stay visible.');
     const ex = document.getElementById('mode-explainer');
-    ex.innerHTML += ' <b>' + lastTotalLegs.toLocaleString() + '</b> trips reach streets outside the core; ' + lastApproachSkipped.toLocaleString() + ' stay entirely inside and are left out.';
+    ex.innerHTML += ' <b>' + lastTotalLegs.toLocaleString() + '</b> lot-to-stadium trips reach a named public street outside the core; ' + lastApproachSkipped.toLocaleString() + ' do not and are left out.';
   }
   renderRankedPointsChart();
   if(mapMode === 'approach'){
@@ -1332,9 +1371,24 @@ function updateColorLegend(maxTotal, streetRoles){
   flows.style.display = '';
   categorical.classList.remove('visible');
 
+  if((mapMode === 'volume' || mapMode === 'approach') && classMode && lastClasses.length){
+    ramp.style.display = 'none';
+    minmaxRow.style.display = 'none';
+    label.textContent = (mapMode === 'approach' ? 'Named public streets outside the core' : 'Streets') + (shareMode ? ' · share of trips' : ' · estimated people') + ' (5 classes, equal street counts)';
+    categorical.classList.add('visible');
+    const off = CLASS_COLORS.length - lastClasses.length;
+    const rows = lastClasses.map((c,j)=>{
+      const lab = j === 0 ? `up to ${fmtCount(c.hi, lastTotalLegs)}`
+                : (j === lastClasses.length-1 ? `over ${fmtCount(c.lo, lastTotalLegs)}` : `${fmtCount(c.lo, lastTotalLegs)} – ${fmtCount(c.hi, lastTotalLegs)}`);
+      return `<div class="row" style="cursor:default"><i class="sw" style="background:${CLASS_COLORS[j+off]};height:${Math.min(9, CLASS_WEIGHTS[j+off])}px"></i>${lab} <span style="opacity:.6">· ${c.n} street${c.n===1?'':'s'}</span></div>`;
+    }).reverse().join('');
+    categorical.innerHTML = rows;
+    return;
+  }
+
   if(mapMode === 'volume' || mapMode === 'approach'){
     ramp.className = 'ramp';
-    label.textContent = (mapMode === 'approach' ? 'Outside the core (scaled to busiest non-boundary street): ' : '') + (shareMode ? 'share of trips per street' : 'estimated people per street');
+    label.textContent = (mapMode === 'approach' ? 'Outside the core: ' : '') + (shareMode ? 'share of trips per street' : 'estimated people per street');
     minEl.textContent = shareMode ? '0%' : fmtCount(0, lastTotalLegs);
     maxEl.textContent = fmtCount(maxTotal, lastTotalLegs);
   } else {
@@ -1416,6 +1470,13 @@ function renderMap(lotsInput, residencyFilter){
 
   updateFilterSummary(lots, residencyFilter, totalCount);
   updateTourPill();
+  const cb = document.getElementById('class-toggle');
+  if(cb){
+    const on = !!classModeByView[mapMode];
+    cb.style.display = (mapMode === 'volume' || mapMode === 'approach') ? '' : 'none';
+    cb.classList.toggle('active', on);
+    cb.textContent = on ? '▤ Color classes' : '▭ Smooth color';
+  }
 
   allLotNames.forEach(lot=>{
     const active = lots.includes(lot);
@@ -1937,6 +1998,12 @@ document.getElementById('top20-toggle').addEventListener('click', (e)=>{
   renderMap([...activeLots], activeResidency);
 });
 
+document.getElementById('class-toggle').addEventListener('click', (e)=>{
+  if(mapMode === 'volume' || mapMode === 'approach') classModeByView[mapMode] = !classModeByView[mapMode];
+  manualOverride = true;
+  document.getElementById('override-note').classList.add('visible');
+  renderMap([...activeLots], activeResidency);
+});
 document.getElementById('share-mode-toggle').addEventListener('click', (e)=>{
   shareMode = !shareMode;
   e.target.classList.toggle('active', shareMode);
